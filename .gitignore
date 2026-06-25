@@ -6,6 +6,8 @@ __pycache__/
 data/raw/
 data/*.db
 !data/corpus.json
+!data/chart_catalog.json
+data/.spotify_tracks_dataset.csv
 *.pdf
 !deck/NL Spotify.pdf
 .DS_Store

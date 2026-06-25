@@ -30,13 +30,16 @@ print(f'Indexed {store.count()} reviews')
 # Bridge demo (no Spotify keys)
 python -c "
 from mvp.bridge import create_bridge_session
+from mvp.chart_catalog import catalog_count, search_tracks
 from mvp.oembed import lookup_track_oembed
+assert catalog_count() >= 1000, f'chart catalog too small: {catalog_count()}'
+assert len(search_tracks('taylor swift', limit=5)) >= 1
 assert lookup_track_oembed('35KiiILklye1JRRctaLUb4')['name'] == 'Holocene'
 s = create_bridge_session('Like Khruangbin but more energetic', force_demo=True)
 assert len(s.tracks) == 8
 s2 = create_bridge_session('warm indie', anchor_track_id='35KiiILklye1JRRctaLUb4', force_demo=True)
 assert 'Holocene' in s2.anchor_track
-print('Bridge demo OK:', s.tracks[0].name)
+print('Bridge demo OK:', s.tracks[0].name, '| catalog:', catalog_count())
 "
 
 uvicorn api.main:app --host 127.0.0.1 --port 8765 &

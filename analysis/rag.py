@@ -7,6 +7,23 @@ from discovery.config import get_settings
 from discovery.models import AskResponse
 from analysis.store import ReviewStore
 
+_ANSWER_FOOTER_RE = re.compile(
+    r"\n+(?:Note|Notes|Additionally|In summary|Overall|To summarize|"
+    r"Based on the (?:above|evidence|reviews)|"
+    r"It(?:'s| is) (?:worth|important) noting)[:\s].*$",
+    re.I | re.S,
+)
+
+
+def _clean_answer(text: str) -> str:
+    """Strip trailing meta-commentary and filler the model sometimes adds."""
+    if not text:
+        return text
+    cleaned = _ANSWER_FOOTER_RE.sub("", text.strip()).strip()
+    cleaned = re.sub(r"\s*\[(?:id\d+|r\d+)\]\s*$", "", cleaned, flags=re.I)
+    return cleaned
+
+
 CANONICAL_QUESTIONS = {
     "why_struggle": "Why do users struggle to discover new music?",
     "rec_frustrations": "What are the most common frustrations with recommendations?",
@@ -76,14 +93,19 @@ def ask(question: str, store: ReviewStore | None = None) -> AskResponse:
     )
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     prompt = f"""You are a Spotify Growth PM analyst. Answer using ONLY the review evidence below.
-Cite review IDs in brackets. Be concise (3-5 sentences).
+
+Rules:
+- Write 2-4 direct sentences answering the question. No preamble ("Based on the reviews…").
+- No disclaimers, follow-up offers, or notes after the answer.
+- Do not repeat the question. Do not add sections titled Note/Additionally/Summary.
+- Cite review IDs inline in brackets only where needed (e.g. [r42]).
 
 Question: {question}
 
 Reviews:
 {context}
 
-Return JSON: {{"answer": "...", "cited_ids": ["id1", "id2"]}}"""
+Return JSON only: {{"answer": "...", "cited_ids": ["id1", "id2"]}}"""
     msg = client.messages.create(
         model="claude-3-5-haiku-20241022",
         max_tokens=512,
@@ -98,6 +120,10 @@ Return JSON: {{"answer": "...", "cited_ids": ["id1", "id2"]}}"""
             for h in hits
             if h[0].id in cited
         ] or [{"id": h[0].id, "text": h[0].text[:160], "url": h[0].url} for h in hits[:3]]
-        return AskResponse(question=question, answer=data.get("answer", ""), citations=citations)
+        return AskResponse(
+            question=question,
+            answer=_clean_answer(data.get("answer", "")),
+            citations=citations,
+        )
     except Exception:
         return _mock_answer(question, hits)

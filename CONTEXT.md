@@ -31,8 +31,9 @@
 ## Key technical decisions
 - **Spotify Recommendations API is deprecated** for new apps → bridge uses
   **Search + artist top tracks** + LLM/heuristic planner (`mvp/bridge.py`).
-- **Demo mode** uses a fixed catalog in `mvp/demo_tracks.py` (no API keys).
-  IDs must pass `scripts/verify_demo_tracks.py` (Spotify oEmbed check).
+- **Demo mode** uses a static **chart catalog** (`data/chart_catalog.json`, ~10k
+  popular tracks) plus curated picks in `mvp/demo_tracks.py` — no API keys.
+  Regenerate: `python scripts/build_chart_catalog.py`. Demo IDs pass oEmbed check.
 - **OAuth:** PKCE flow, tokens in **HttpOnly signed cookies** (`mvp/auth.py`,
   `mvp/session.py`), callback `/mvp/callback`.
 - **Vercel routing:** all paths → `api/main.py` (`vercel.json`); earlier CSS 404
@@ -61,7 +62,8 @@ Extended Quota is approved).
 Features for unlimited public use:
 - Bridge Sessions (8-track journeys, verified Spotify links, **album art**)
 - Paste **any** public Spotify track URL as anchor (oEmbed lookup)
-- **Search bar** — full Spotify catalog when API keys set; demo catalog otherwise
+- **Search bar** — full Spotify catalog when API keys set; **10k chart hits**
+  from static catalog otherwise (HuggingFace popularity dataset, no cost)
 - **Share bridge** via copy-link (`/#bridge?intent=…&anchor=…`)
 - Discovery Lab + Ask Corpus
 
@@ -113,6 +115,11 @@ is available.
 - Do **not** edit `.cursor/plans/spotify_discovery_pm_5640145e.plan.md`
 
 ## Session log (recent)
+- **2026-06-25:** UX pass — removed duplicate sidebar shortcuts (nav tabs only);
+  Ask Corpus answers tightened (prompt + post-process; citations in collapsible
+  section); Discovery Lab themes/segments clickable with drill-down + bridge/ask.
+- **2026-06-25:** Static **10k chart catalog** — `data/chart_catalog.json` from
+  HuggingFace popularity dataset; search + bridge pool without Spotify API keys.
 - **2026-06-25:** Public demo-first UX — share links, oEmbed anchors, Connect
   Spotify moved to private beta messaging.
 - **2026-06-25:** Steps 5–6 blocked — Spotify Developer requires Premium;

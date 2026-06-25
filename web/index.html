@@ -40,22 +40,6 @@
           <span>Ask Corpus</span>
         </button>
       </nav>
-
-      <p class="sidebar__section-label">Your shortcuts</p>
-      <div class="sidebar__list">
-        <div class="sidebar__list-item" data-tab="bridge">
-          <div class="sidebar__list-icon sidebar__list-icon--green">🌉</div>
-          <span>Bridge Sessions</span>
-        </div>
-        <div class="sidebar__list-item" data-tab="insights">
-          <div class="sidebar__list-icon sidebar__list-icon--cool">📊</div>
-          <span>User Voice Insights</span>
-        </div>
-        <div class="sidebar__list-item" data-tab="ask">
-          <div class="sidebar__list-icon sidebar__list-icon--warm">💬</div>
-          <span>Discovery Q&amp;A</span>
-        </div>
-      </div>
     </aside>
 
     <!-- Main -->
@@ -191,11 +175,8 @@
         <!-- INSIGHTS -->
         <section class="panel" id="panel-insights">
           <h1 class="greeting" style="font-size:32px">Discovery Lab</h1>
-          <p style="color:var(--text-subdued);margin:-16px 0 24px">AI analysis of 553+ App Store, Play Store &amp; forum reviews</p>
-          <div class="bridge-actions" style="margin-bottom:24px">
-            <button id="runIngest" class="btn-spotify btn-spotify--green">Run analysis</button>
-            <button id="loadInsights" class="btn-spotify btn-spotify--ghost">Refresh</button>
-          </div>
+          <p id="insightSubtitle" style="color:var(--text-subdued);margin:-16px 0 24px">Insights from user reviews — click a theme or segment to explore</p>
+          <div id="themeDetail" class="theme-detail hidden"></div>
           <div class="insight-grid">
             <div><h3 style="font-size:16px;margin:0 0 16px">Themes</h3><div id="themes"></div></div>
             <div><h3 style="font-size:16px;margin:0 0 16px">User segments</h3><div id="segments"></div></div>

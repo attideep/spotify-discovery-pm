@@ -6,6 +6,7 @@ from typing import Any
 
 from discovery.config import get_settings
 from discovery.models import BridgeSession, BridgeTrack
+from mvp.chart_catalog import bridge_candidates, get_track
 from mvp.demo_tracks import DEMO_TRACKS
 from mvp.oembed import lookup_track_oembed
 from mvp.parse import track_url
@@ -69,12 +70,8 @@ def _gather_candidates(client: SpotifyClient | None, anchor: dict, intent: str) 
             except SpotifyAPIError:
                 pass
 
-    for d in DEMO_TRACKS:
-        pool.append(
-            enrich_track_meta(
-                {**d, "spotify_url": track_url(d["id"]), "uri": f"spotify:track:{d['id']}"}
-            )
-        )
+    for c in bridge_candidates(anchor, intent, limit=40):
+        pool.append(enrich_track_meta(c))
 
     return _dedupe_candidates(pool, {anchor["id"]})
 
@@ -202,9 +199,9 @@ def resolve_anchor(
                 return normalize_track(client.get_track(anchor_track_id))
             except SpotifyAPIError as e:
                 raise BridgeError(str(e), e.code, e.status) from e
-        for d in DEMO_TRACKS:
-            if d["id"] == anchor_track_id:
-                return {**d, "spotify_url": track_url(d["id"]), "uri": f"spotify:track:{d['id']}"}
+        hit = get_track(anchor_track_id)
+        if hit:
+            return enrich_track_meta(hit)
         oembed = lookup_track_oembed(anchor_track_id)
         if oembed:
             return enrich_track_meta(oembed)

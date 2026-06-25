@@ -22,7 +22,7 @@ from mvp.auth import (
     refreshed_session_cookie,
 )
 from mvp.bridge import BridgeError, create_bridge_session, save_bridge_to_playlist
-from mvp.demo_tracks import DEMO_TRACKS
+from mvp.chart_catalog import catalog_count, search_tracks as chart_search
 from mvp.parse import parse_track_id
 from mvp.track_lookup import enrich_track_meta, lookup_track
 from mvp.session import (
@@ -108,7 +108,8 @@ def health() -> dict:
         "status": "ok",
         "reviews_indexed": store.count(),
         "spotify_configured": settings.spotify_configured,
-        "catalog_search": settings.spotify_configured,
+        "catalog_search": settings.spotify_configured or catalog_count() > 0,
+        "chart_catalog_tracks": catalog_count(),
         "llm_configured": bool(settings.anthropic_api_key),
         "allow_demo_mode": settings.allow_demo_mode,
     }
@@ -273,20 +274,12 @@ def api_search_tracks(q: str) -> dict:
         except SpotifyAPIError as e:
             raise HTTPException(e.status or 502, str(e)) from e
 
-    needle = query.lower()
-    hits = []
-    for d in DEMO_TRACKS:
-        blob = f"{d['name']} {d['artist']}".lower()
-        if needle in blob:
-            hits.append(
-                enrich_track_meta(
-                    {**d, "spotify_url": f"https://open.spotify.com/track/{d['id']}"}
-                )
-            )
+    hits = [enrich_track_meta(t) for t in chart_search(query, limit=12)]
+    n = catalog_count()
     return {
-        "tracks": hits[:12],
-        "mode": "demo_catalog",
-        "hint": "Add Spotify API keys for full catalog search (see docs/PRODUCTION.md).",
+        "tracks": hits,
+        "mode": "chart_catalog",
+        "hint": f"Searching {n:,} chart hits — no login required. Add Spotify API keys for the full catalog.",
     }
 
 

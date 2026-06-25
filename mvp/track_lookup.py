@@ -1,13 +1,17 @@
 """Resolve a Spotify track ID to metadata (demo catalog → oEmbed → live API)."""
 from __future__ import annotations
 
+from mvp.chart_catalog import get_track
 from mvp.demo_tracks import DEMO_TRACKS
 from mvp.oembed import lookup_track_oembed
 from mvp.parse import track_url
 from mvp.spotify_client import SpotifyClient, normalize_track
 
 
-def _from_demo_catalog(track_id: str) -> dict | None:
+def _from_static_catalog(track_id: str) -> dict | None:
+    hit = get_track(track_id)
+    if hit:
+        return hit
     for d in DEMO_TRACKS:
         if d["id"] == track_id:
             return {
@@ -34,7 +38,7 @@ def enrich_track_meta(meta: dict) -> dict:
 
 
 def lookup_track(track_id: str, client: SpotifyClient | None = None) -> dict | None:
-    hit = _from_demo_catalog(track_id)
+    hit = _from_static_catalog(track_id)
     if hit:
         return enrich_track_meta(hit)
 

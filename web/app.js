@@ -172,6 +172,31 @@ function clearBridgeError() {
 /* ── Tab navigation ── */
 const TAB_ACCENTS = { home: "home", bridge: "bridge", insights: "insights", ask: "insights" };
 
+const THEME_BRIDGE_INTENTS = {
+  discovery_fatigue: "Gradual discovery — low-effort steps from music I already love",
+  recommendation_irrelevance: "Fresh recommendations that don't repeat my usual playlists",
+  comfort_loop: "Help me expand beyond my comfort playlists without random jumps",
+  algorithm_anxiety: "Explainable music suggestions I can trust",
+  social_discovery: "Discovery paths inspired by what friends share",
+  podcast_drift: "More music discovery, less podcast clutter in my feed",
+  ui_friction: "Easy-to-find discovery features for new artists",
+  positive_discovery: "Recreate that magical discovery moment more often",
+};
+
+const SEGMENT_BRIDGE_INTENTS = {
+  comfort_loop_curator: "Gradual bridges from my favorite playlists toward something new",
+  algorithm_skeptic: "Transparent, explainable track suggestions — not black-box picks",
+  context_switcher: "Discovery that fits my current mood and context",
+  social_discoverer: "Novel artists through trusted social signals",
+  time_poor_commuter: "Quick, low-effort discovery for my commute",
+  genre_explorer_burned: "Controlled novelty — diverse but not random genre jumps",
+  general: "Safe steps toward new music without leaving my taste zone",
+};
+
+let insightsCache = null;
+let activeTheme = null;
+let activeSegment = null;
+
 function switchTab(tab, { preserveQuery = false } = {}) {
   document.querySelectorAll(".nav-item").forEach(n => {
     n.classList.toggle("active", n.dataset.tab === tab);
@@ -215,7 +240,7 @@ function initExampleChips() {
   });
 }
 
-document.querySelectorAll(".nav-item, .sidebar__list-item, .media-card, [data-tab]").forEach(el => {
+document.querySelectorAll(".nav-item, .media-card, [data-tab]").forEach(el => {
   el.addEventListener("click", e => {
     const tab = el.dataset.tab;
     if (tab) {
@@ -312,19 +337,134 @@ document.getElementById("anchorInput")?.addEventListener("change", previewAnchor
 document.getElementById("anchorInput")?.addEventListener("blur", previewAnchor);
 
 /* ── Insights ── */
+function themeLabel(theme) {
+  return theme.replace(/_/g, " ");
+}
+
+function themeAskQuestion(theme, summary) {
+  return `What do users say about ${themeLabel(theme)}? ${summary}`;
+}
+
+function showThemeDetail(theme) {
+  activeTheme = theme.theme;
+  activeSegment = null;
+  document.querySelectorAll(".theme-card").forEach(c => {
+    c.classList.toggle("theme-card--active", c.dataset.theme === theme.theme);
+  });
+  document.querySelectorAll(".segment-chip").forEach(c => c.classList.remove("segment-chip--active"));
+
+  const detail = document.getElementById("themeDetail");
+  detail.classList.remove("hidden");
+  const quotes = (theme.exemplars || []).slice(0, 3).map(ex => `
+    <blockquote class="theme-detail__quote">"${ex.text}"${ex.url ? ` — <a href="${ex.url}" target="_blank" rel="noopener">source</a>` : ""}</blockquote>
+  `).join("") || `<p class="theme-detail__empty">No sample quotes loaded for this theme.</p>`;
+
+  detail.innerHTML = `
+    <div class="theme-detail__head">
+      <div>
+        <h3 class="theme-detail__title">${themeLabel(theme.theme)}</h3>
+        <p class="theme-detail__meta">${theme.pct}% of reviews · ${theme.count} mentions</p>
+      </div>
+      <button type="button" class="theme-detail__close" aria-label="Close">&times;</button>
+    </div>
+    <p class="theme-detail__summary">${theme.summary}</p>
+    <div class="theme-detail__quotes">${quotes}</div>
+    <div class="chip-row chip-row--compact">
+      <button type="button" class="chip" data-action="ask-theme">Ask about this theme</button>
+      <button type="button" class="chip" data-action="bridge-theme">Try bridge for this</button>
+    </div>`;
+
+  detail.querySelector(".theme-detail__close")?.addEventListener("click", clearThemeDetail);
+  detail.querySelector('[data-action="ask-theme"]')?.addEventListener("click", () => {
+    document.getElementById("questionInput").value = themeAskQuestion(theme.theme, theme.summary);
+    switchTab("ask");
+    askAboutQuestion(themeAskQuestion(theme.theme, theme.summary));
+  });
+  detail.querySelector('[data-action="bridge-theme"]')?.addEventListener("click", () => {
+    document.getElementById("intentInput").value = THEME_BRIDGE_INTENTS[theme.theme] || theme.summary;
+    switchTab("bridge");
+    document.getElementById("intentInput")?.focus();
+    toast("Intent set — add an anchor track and generate");
+  });
+}
+
+function showSegmentDetail(key, count, total) {
+  activeSegment = key;
+  activeTheme = null;
+  document.querySelectorAll(".segment-chip").forEach(c => {
+    c.classList.toggle("segment-chip--active", c.dataset.segment === key);
+  });
+  document.querySelectorAll(".theme-card").forEach(c => c.classList.remove("theme-card--active"));
+
+  const pct = Math.round(100 * count / total);
+  const label = themeLabel(key);
+  const intent = SEGMENT_BRIDGE_INTENTS[key] || SEGMENT_BRIDGE_INTENTS.general;
+  const detail = document.getElementById("themeDetail");
+  detail.classList.remove("hidden");
+  detail.innerHTML = `
+    <div class="theme-detail__head">
+      <div>
+        <h3 class="theme-detail__title">${label}</h3>
+        <p class="theme-detail__meta">${pct}% of corpus · ${count} reviews</p>
+      </div>
+      <button type="button" class="theme-detail__close" aria-label="Close">&times;</button>
+    </div>
+    <p class="theme-detail__summary">Users in this segment describe discovery differently — bridge sessions can target their specific friction.</p>
+    <div class="chip-row chip-row--compact">
+      <button type="button" class="chip" data-action="ask-segment">Ask about ${label}</button>
+      <button type="button" class="chip" data-action="bridge-segment">Bridge for this segment</button>
+    </div>`;
+
+  detail.querySelector(".theme-detail__close")?.addEventListener("click", clearThemeDetail);
+  detail.querySelector('[data-action="ask-segment"]')?.addEventListener("click", () => {
+    const q = `What discovery challenges do ${label} users face?`;
+    document.getElementById("questionInput").value = q;
+    switchTab("ask");
+    askAboutQuestion(q);
+  });
+  detail.querySelector('[data-action="bridge-segment"]')?.addEventListener("click", () => {
+    document.getElementById("intentInput").value = intent;
+    switchTab("bridge");
+    document.getElementById("intentInput")?.focus();
+    toast("Intent set for this segment — generate when ready");
+  });
+}
+
+function clearThemeDetail() {
+  activeTheme = null;
+  activeSegment = null;
+  document.getElementById("themeDetail")?.classList.add("hidden");
+  document.querySelectorAll(".theme-card, .segment-chip").forEach(c => {
+    c.classList.remove("theme-card--active", "segment-chip--active");
+  });
+}
+
 function renderThemes(themes, targetId = "themes") {
   const el = document.getElementById(targetId);
   if (!el) return;
   el.innerHTML = themes.slice(0, 8).map(t => `
-    <div class="theme-card">
+    <button type="button" class="theme-card" data-theme="${t.theme}" aria-pressed="false">
       <div class="theme-card__head">
-        <span class="theme-card__name">${t.theme.replace(/_/g, " ")}</span>
+        <span class="theme-card__name">${themeLabel(t.theme)}</span>
         <span class="theme-card__pct">${t.pct}%</span>
       </div>
       <div class="theme-card__bar"><div class="theme-card__fill" style="width:${Math.min(t.pct * 2.5, 100)}%"></div></div>
       <p class="theme-card__summary">${t.summary}</p>
-    </div>
+    </button>
   `).join("");
+
+  el.querySelectorAll(".theme-card").forEach(card => {
+    card.addEventListener("click", () => {
+      const theme = themes.find(t => t.theme === card.dataset.theme);
+      if (!theme) return;
+      if (activeTheme === theme.theme) {
+        clearThemeDetail();
+        return;
+      }
+      showThemeDetail(theme);
+      document.getElementById("themeDetail")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  });
 }
 
 function renderHomeThemes(themes) {
@@ -359,30 +499,75 @@ function renderSegments(segments) {
     .map(([k, v]) => {
       const pct = Math.round(100 * v / total);
       return `
-        <div class="segment-chip">
-          <span style="min-width:140px;text-transform:capitalize">${k.replace(/_/g, " ")}</span>
+        <button type="button" class="segment-chip" data-segment="${k}" aria-pressed="false">
+          <span style="min-width:140px;text-transform:capitalize">${themeLabel(k)}</span>
           <div class="segment-chip__bar-wrap"><div class="segment-chip__bar" style="width:${pct}%"></div></div>
           <span style="color:var(--text-subdued);font-size:13px">${pct}%</span>
-        </div>`;
+        </button>`;
     }).join("");
+
+  el.querySelectorAll(".segment-chip").forEach(chip => {
+    chip.addEventListener("click", () => {
+      const key = chip.dataset.segment;
+      const count = segments[key] || 0;
+      if (activeSegment === key) {
+        clearThemeDetail();
+        return;
+      }
+      showSegmentDetail(key, count, total);
+      document.getElementById("themeDetail")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+  });
+}
+
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
 }
 
 function renderAnswer(data) {
   const el = document.getElementById("answer");
   el.classList.remove("hidden");
-  const cites = (data.citations || []).map(c =>
-    `<div class="citation"><strong>[${c.id}]</strong> ${c.text}${c.url ? ` — <a href="${c.url}" target="_blank" style="color:var(--green)">source</a>` : ""}</div>`
-  ).join("");
-  el.innerHTML = `<div class="answer-box__q">${data.question}</div><p>${data.answer}</p>${cites}`;
+  const answer = escapeHtml(data.answer || "").replace(/\n/g, "<br/>");
+  const cites = (data.citations || []).filter(c => c.text);
+  const citeHtml = cites.length
+    ? `<details class="answer-box__sources">
+        <summary>Source quotes (${cites.length})</summary>
+        ${cites.map(c =>
+          `<div class="citation"><span class="citation__text">"${escapeHtml(c.text)}"</span>${c.url ? ` <a href="${escapeHtml(c.url)}" target="_blank" rel="noopener">source</a>` : ""}</div>`
+        ).join("")}
+      </details>`
+    : "";
+  el.innerHTML = `
+    <div class="answer-box__q">${escapeHtml(data.question)}</div>
+    <p class="answer-box__body">${answer}</p>
+    ${citeHtml}`;
+}
+
+async function askAboutQuestion(q) {
+  const resp = await fetchJSON("/api/ask", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ question: q }),
+  });
+  renderAnswer(resp);
 }
 
 async function loadInsights() {
   const data = await fetchJSON("/api/insights");
+  insightsCache = data;
   renderThemes(data.themes);
   renderHomeThemes(data.themes);
   renderSegments(data.segments);
   document.getElementById("statReviews").textContent = data.total_reviews;
   document.getElementById("statThemes").textContent = data.themes.length;
+  const subtitle = document.getElementById("insightSubtitle");
+  if (subtitle) {
+    subtitle.textContent = `${data.total_reviews} reviews analyzed — click a theme or segment to explore`;
+  }
 
   const btns = document.getElementById("canonicalBtns");
   btns.innerHTML = Object.entries(data.canonical_questions).map(([k, q]) =>
@@ -396,15 +581,6 @@ async function loadInsights() {
     });
   });
 }
-
-document.getElementById("runIngest")?.addEventListener("click", async () => {
-  toast("Running analysis…");
-  const data = await fetchJSON("/api/ingest", { method: "POST" });
-  toast(`Indexed ${data.indexed} reviews`);
-  await loadInsights();
-});
-
-document.getElementById("loadInsights")?.addEventListener("click", () => loadInsights().then(() => toast("Refreshed")));
 
 document.getElementById("askBtn")?.addEventListener("click", async () => {
   const q = document.getElementById("questionInput").value.trim();
