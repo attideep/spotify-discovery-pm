@@ -57,8 +57,8 @@ SLIDES = [
     ]),
     ("Success metrics, rollout, and test links", [
         "Metrics: bridge completion >40%, save rate >15%",
-        "Review Engine: / (Discovery Engine UI)",
-        "Bridge Sessions MVP: /bridge.html",
+        "Review Engine: https://spotify-discovery-pm.vercel.app",
+        "Bridge Sessions: https://spotify-discovery-pm.vercel.app/bridge.html",
         "Research: interviews/, quote_bank.md",
     ]),
 ]

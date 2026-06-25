@@ -6,11 +6,10 @@ Growth PM assignment: AI-powered review analysis, user research synthesis, probl
 
 | Artifact | URL |
 |----------|-----|
-| Review Discovery Engine | Run locally or deploy — see below |
-| Bridge Sessions MVP | `/bridge.html` on same host |
-| API docs | `/docs` (FastAPI Swagger) |
-
-> **Deploy:** `docker compose up` or `uvicorn api.main:app --port 8000` then open http://localhost:8000
+| Review Discovery Engine | https://spotify-discovery-pm.vercel.app |
+| Bridge Sessions MVP | https://spotify-discovery-pm.vercel.app/bridge.html |
+| API docs | https://spotify-discovery-pm.vercel.app/docs |
+| Deck (PDF) | `deck/NL Spotify.pdf` |
 
 ## Quick start
 
