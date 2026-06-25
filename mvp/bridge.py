@@ -6,7 +6,7 @@ from typing import Any
 
 from discovery.config import get_settings
 from discovery.models import BridgeSession, BridgeTrack
-from mvp.chart_catalog import bridge_candidates, get_track
+from mvp.chart_catalog import bridge_candidates, get_track, _stable_seed, _tokens, _token_in_blob, _track_key
 from mvp.demo_tracks import DEMO_TRACKS
 from mvp.oembed import lookup_track_oembed
 from mvp.parse import track_url
@@ -21,14 +21,19 @@ class BridgeError(Exception):
         self.status = status
 
 
-def _dedupe_candidates(candidates: list[dict], exclude_ids: set[str]) -> list[dict]:
+def _dedupe_candidates(candidates: list[dict], exclude_ids: set[str], anchor: dict | None = None) -> list[dict]:
     seen: set[str] = set()
+    seen_keys: set[str] = set()
+    if anchor:
+        seen_keys.add(_track_key(anchor))
     out = []
     for c in candidates:
         tid = c["id"]
-        if tid in seen or tid in exclude_ids:
+        key = _track_key(c)
+        if tid in seen or tid in exclude_ids or key in seen_keys:
             continue
         seen.add(tid)
+        seen_keys.add(key)
         out.append(c)
     return out
 
@@ -70,10 +75,10 @@ def _gather_candidates(client: SpotifyClient | None, anchor: dict, intent: str) 
             except SpotifyAPIError:
                 pass
 
-    for c in bridge_candidates(anchor, intent, limit=40):
+    for c in bridge_candidates(anchor, intent, limit=60):
         pool.append(enrich_track_meta(c))
 
-    return _dedupe_candidates(pool, {anchor["id"]})
+    return _dedupe_candidates(pool, {anchor["id"]}, anchor)
 
 
 def _plan_with_llm(
@@ -126,15 +131,94 @@ Must be exactly 8 tracks, all IDs from catalog."""
 
 
 def _plan_heuristic(anchor: dict, candidates: list[dict], intent: str) -> list[dict]:
-    picks = candidates[:8]
+    """Pick 8 tracks with increasing novelty — anchor/intent determine the pool, not a fixed demo list."""
+    anchor_id = anchor["id"]
+    anchor_artist = (anchor.get("artist") or "").lower()
+    anchor_key = _track_key(anchor)
+    intent_tokens = _tokens(intent)
+    seed = _stable_seed(anchor_id, intent)
+
+    scored: list[tuple[float, int, int, dict]] = []
+    for c in candidates:
+        if c["id"] == anchor_id or _track_key(c) == anchor_key:
+            continue
+        blob = f"{c.get('name', '')} {c.get('artist', '')}".lower()
+        track_artist = (c.get("artist") or "").lower()
+        same_artist = bool(anchor_artist) and anchor_artist.split(",")[0].strip() in track_artist
+        intent_hits = sum(1 for t in intent_tokens if _token_in_blob(t, blob))
+        anchor_overlap = sum(
+            1 for t in _tokens(f"{anchor.get('name', '')} {anchor_artist}") if _token_in_blob(t, blob)
+        )
+
+        if same_artist:
+            familiarity = 0.0
+        elif intent_hits >= 2:
+            familiarity = 0.35
+        elif intent_hits == 1 or anchor_overlap >= 2:
+            familiarity = 0.55
+        else:
+            familiarity = 0.78
+
+        tie = (seed ^ hash(c["id"])) & 0xFFFF
+        scored.append((familiarity, -intent_hits, tie, c))
+
+    scored.sort(key=lambda x: (x[0], x[1], x[2]))
+
+    if len(scored) < 8:
+        return _plan_heuristic_fallback(anchor, candidates, intent, scored)
+
+    n = len(scored)
+    picks: list[dict] = []
+    seen: set[str] = set()
+    for step in range(8):
+        idx = min(int(step * (n - 1) / 7), n - 1)
+        for j in range(n):
+            pos = (idx + j) % n
+            c = scored[pos][3]
+            if c["id"] not in seen:
+                seen.add(c["id"])
+                picks.append(c)
+                break
+
     out = []
-    for i, c in enumerate(picks):
+    for i, c in enumerate(picks[:8]):
+        blob = f"{c.get('name', '')} {c.get('artist', '')}".lower()
+        intent_hits = sum(1 for t in intent_tokens if _token_in_blob(t, blob))
+        same_artist = bool(anchor_artist) and anchor_artist.split(",")[0].strip() in (c.get("artist") or "").lower()
+        if same_artist:
+            why = f"Stays close to {anchor['name']} while opening toward your intent."
+        elif intent_hits:
+            why = f"Matches “{' '.join(intent_tokens[:3])}” — step {i + 1} toward something new."
+        else:
+            why = f"A stretch pick that widens the path from {anchor['name']}."
         out.append(
             {
                 "id": c["id"],
-                "explanation": (
-                    f"Step {i + 1} from {anchor['name']}: bridges toward your goal — {intent[:60]}"
-                ),
+                "explanation": why,
+                "novelty_score": round(0.12 + i * 0.11, 2),
+            }
+        )
+    return out
+
+
+def _plan_heuristic_fallback(
+    anchor: dict,
+    candidates: list[dict],
+    intent: str,
+    scored: list[tuple[float, int, int, dict]],
+) -> list[dict]:
+    picks = [s[3] for s in scored]
+    for c in candidates:
+        if c["id"] != anchor["id"] and c not in picks:
+            picks.append(c)
+        if len(picks) >= 8:
+            break
+    out = []
+    for i, c in enumerate(picks[:8]):
+        out.append(
+            {
+                "id": c["id"],
+                "explanation": f"Step {i + 1} from {anchor['name']} toward {intent[:50]}",
                 "novelty_score": round(0.15 + i * 0.1, 2),
             }
         )

@@ -1,6 +1,7 @@
 """Static chart catalog — ~10k popular tracks, no Spotify API keys."""
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 from functools import lru_cache
@@ -86,39 +87,72 @@ def search_tracks(query: str, *, limit: int = 12, any_token: bool = False) -> li
     return [_normalize(t) for t in hits[:limit]]
 
 
-def bridge_candidates(anchor: dict, intent: str, *, limit: int = 40) -> list[dict]:
+def _track_key(t: dict) -> str:
+    return f"{(t.get('name') or '').lower()}|{(t.get('artist') or '').split(',')[0].strip().lower()}"
+
+
+def bridge_candidates(anchor: dict, intent: str, *, limit: int = 60) -> list[dict]:
     """Intent/artist-aware pool for demo bridges (no live Search API)."""
+    anchor_key = _track_key(anchor)
     seen: set[str] = {anchor["id"]}
+    seen_keys: set[str] = {anchor_key}
     pool: list[dict] = []
 
-    for d in DEMO_TRACKS:
-        if d["id"] not in seen:
-            seen.add(d["id"])
-            pool.append(_normalize({**d, "popularity": 100}))
-
-    queries = [
-        intent[:80],
-        (anchor.get("artist") or "").split(",")[0].strip(),
-        f"{anchor.get('artist', '')} {intent[:40]}".strip(),
-    ]
-    for q in queries:
-        if not q:
-            continue
-        for t in search_tracks(q, limit=limit, any_token=True):
-            if t["id"] in seen:
+    def add(tracks: list[dict]) -> None:
+        for t in tracks:
+            key = _track_key(t)
+            if t["id"] in seen or key in seen_keys:
                 continue
             seen.add(t["id"])
+            seen_keys.add(key)
             pool.append(t)
+
+    artist = (anchor.get("artist") or "").split(",")[0].strip()
+    anchor_name = (anchor.get("name") or "").strip()
+
+    if artist:
+        add(search_tracks(artist, limit=16, any_token=True))
+    if anchor_name:
+        add(search_tracks(anchor_name, limit=8, any_token=True))
+
+    add(search_tracks(intent, limit=20))
+    for token in _tokens(intent)[:6]:
+        add(search_tracks(token, limit=10, any_token=False))
+
+    if artist:
+        add(search_tracks(f"{artist} {intent[:50]}".strip(), limit=12, any_token=True))
+
+    for d in DEMO_TRACKS:
+        if d["id"] in seen:
+            continue
+        if _match(intent, d, any_token=True) or (artist and _token_in_blob(artist.lower(), d.get("artist", "").lower())):
+            add([_normalize({**d, "popularity": max(d.get("popularity", 0), 85)})])
+
+    anchor_pop = anchor.get("popularity") or 70
+    catalog = sorted(_load(), key=lambda x: x.get("popularity", 0), reverse=True)
+    band = [t for t in catalog if abs(t.get("popularity", 0) - anchor_pop) <= 12 and t["id"] not in seen]
+    add([_normalize(t) for t in band[:12]])
+
+    seed = _stable_seed(anchor["id"], intent)
+    remaining = [t for t in catalog if t["id"] not in seen]
+    for i, t in enumerate(remaining):
         if len(pool) >= limit:
             break
+        if (seed + i * 7919) % 17 == 0 or i < 8:
+            add([_normalize(t)])
 
-    if len(pool) < 8:
-        for t in sorted(_load(), key=lambda x: x.get("popularity", 0), reverse=True):
-            if t["id"] in seen:
-                continue
-            seen.add(t["id"])
-            pool.append(_normalize(t))
+    if len(pool) < 16:
+        for t in catalog:
+            if t["id"] not in seen:
+                add([_normalize(t)])
             if len(pool) >= limit:
                 break
 
     return pool[:limit]
+
+
+def _stable_seed(anchor_id: str, intent: str) -> int:
+    import hashlib
+
+    h = hashlib.sha256(f"{anchor_id}|{intent.strip().lower()}".encode()).hexdigest()
+    return int(h[:8], 16)
