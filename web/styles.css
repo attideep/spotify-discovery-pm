@@ -174,29 +174,28 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 }
 
 .main::before {
-  content: "";
-  position: absolute;
-  inset: 0 0 auto 0;
-  height: 220px;
-  background: linear-gradient(180deg, #1a3a2a 0%, var(--bg-elevated) 100%);
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 0.4s;
+  display: none;
 }
 
 .main[data-accent="bridge"]::before {
-  opacity: 1;
+  display: block;
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 280px;
   background: linear-gradient(180deg, #1a3a2a 0%, var(--bg-elevated) 100%);
+  pointer-events: none;
+  opacity: 1;
 }
 
 .main[data-accent="insights"]::before {
-  opacity: 1;
+  display: block;
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 200px;
   background: linear-gradient(180deg, #1a2a3a 0%, var(--bg-elevated) 100%);
-}
-
-.main[data-accent="home"]::before {
-  opacity: 1;
-  background: linear-gradient(180deg, #2a1a3a 0%, var(--bg-elevated) 100%);
+  pointer-events: none;
 }
 
 .topbar {
@@ -335,9 +334,21 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 
 /* ── Cards grid (Spotify-style) ── */
 .card-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  display: flex;
   gap: 12px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding-bottom: 4px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.card-grid::-webkit-scrollbar { display: none; }
+
+.card-grid .media-card {
+  flex: 0 0 148px;
+  width: 148px;
+  min-width: 148px;
 }
 
 .media-card {
@@ -369,9 +380,11 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 
 .cover-gradient {
   display: flex;
-  align-items: flex-end;
-  padding: 16px;
-  font-size: 32px;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  width: 100%;
+  height: 100%;
 }
 
 .media-card__play {
@@ -399,22 +412,23 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 .media-card__play:hover { transform: scale(1.06); background: var(--green-hover); }
 
 .media-card__title {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 700;
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .media-card__desc {
-  font-size: 14px;
+  font-size: 12px;
   color: var(--text-subdued);
   margin: 0;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  line-height: 1.35;
 }
 
 /* ── Stats row ── */
@@ -927,23 +941,17 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 
 @media (max-width: 768px) {
   .app {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr var(--player-h);
+    grid-template-columns: 72px 1fr;
   }
-  .sidebar {
-    grid-row: 1;
-    flex-direction: row;
-    padding: 8px;
-    overflow-x: auto;
-  }
-  .sidebar__list, .sidebar__section-label { display: none; }
-  .sidebar__nav { display: flex; }
-  .nav-item { padding: 8px 12px; font-size: 12px; }
-  .nav-item span { display: none; }
-  .content { padding: 0 16px 80px; }
+  .sidebar__logo-text, .sidebar__badge, .nav-item span, .sidebar__section-label, .sidebar__list { display: none; }
+  .sidebar { padding: 8px 4px; }
+  .nav-item { justify-content: center; padding: 10px; }
+  .content { padding: 0 12px 72px; }
+  .bridge-hero { grid-template-columns: 1fr; }
+  .bridge-hero__art { width: 140px; height: 140px; }
   .track-list-header { display: none; }
-  .track-row {
-    grid-template-columns: 32px 1fr 40px;
-  }
-  .track-row__novelty, .track-row__bridge-note + .track-row__novelty { display: none; }
+  .track-row { grid-template-columns: 32px 1fr 40px; }
+  .track-row__novelty { display: none; }
+  .topbar__search { display: none; }
+  .insight-grid { grid-template-columns: 1fr; }
 }

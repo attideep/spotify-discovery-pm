@@ -68,13 +68,13 @@ function renderHomeThemes(themes) {
     "linear-gradient(135deg,#f59b23,#e91429)",
     "linear-gradient(135deg,#450af5,#c4efd9)",
   ];
-  el.innerHTML = themes.slice(0, 4).map((t, i) => `
+  el.innerHTML = themes.slice(0, 6).map((t, i) => `
     <article class="media-card" data-tab="insights">
       <div class="media-card__cover">
-        <div class="cover-gradient" style="background:${colors[i % colors.length]};font-size:14px;padding:12px;align-items:flex-start">${t.theme.replace(/_/g, " ")}</div>
+        <div class="cover-gradient" style="background:${colors[i % colors.length]}">${Math.round(t.pct)}%</div>
       </div>
-      <p class="media-card__title">${t.pct}% of corpus</p>
-      <p class="media-card__desc">${t.summary.slice(0, 80)}…</p>
+      <p class="media-card__title">${t.theme.replace(/_/g, " ")}</p>
+      <p class="media-card__desc">${t.summary.slice(0, 56)}…</p>
     </article>
   `).join("");
   el.querySelectorAll(".media-card").forEach(c => {
