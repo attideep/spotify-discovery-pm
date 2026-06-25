@@ -1,40 +1,41 @@
 # Bridge Sessions
 
-**Gradual music discovery — AI-planned 8-track journeys from comfort to novelty.**
+**Discover music gradually — one intentional step at a time.**
 
 [**Try it live →**](https://spotify-discovery-pm.vercel.app)
 
-No login required. Search 10,000 chart hits, build bridge sessions from any Spotify track link, explore review insights, and ask questions grounded in 620+ real user voices.
+Bridge Sessions helps you move from a song you already love toward something new. Pick an anchor track, describe the mood you want, and get an 8-song journey with explainable transitions — not a random shuffle, not a wall of recommendations.
+
+Free to use. No login required.
 
 ---
 
-## Features
+## What it is
+
+Most streaming apps optimize for **repeat listening**. Bridge Sessions is built for **discovery** — the moment you want to stretch your taste without jumping straight into the deep end.
 
 | | |
 |---|---|
-| **Bridge Sessions** | Describe your mood or paste a Spotify track URL. Get an 8-track journey with explainable transitions — each step a small hop, not a random shuffle. |
-| **Discovery Lab** | Interactive theme dashboard from App Store, Play Store, Reddit, and HN reviews — see what users actually say about music discovery. |
-| **Ask Corpus** | RAG-powered Q&A over the review corpus with citations. Ask custom questions or use built-in growth prompts. |
-| **Global search** | 10k popular tracks (static catalog, no API keys) or full Spotify catalog when API credentials are configured. |
-| **Share links** | Copy a URL to send a bridge session to anyone — intent and anchor preserved. |
-
-**Optional:** Connect Spotify to save bridge sessions as private playlists (requires API credentials).
+| **Bridge Sessions** | Start from any song. Describe where you want to go. Receive an ordered 8-track path from familiar → novel, each step explained. |
+| **Discovery Lab** | Explore what real listeners say about finding music — themes, frustrations, and patterns pulled from app store and community reviews. |
+| **Ask Corpus** | Ask product and discovery questions and get concise answers grounded in real user feedback. |
+| **Search** | Find anchor tracks by name or artist — paste a Spotify link or just type the song title. |
+| **Share** | Send a link to a friend — they open the exact same bridge you built. |
 
 ---
 
 ## How it works
 
 ```
-Reviews (620+)  →  classify + embed  →  Discovery Lab + Ask Corpus
-Spotify track   →  search + LLM plan  →  8-track Bridge Session
-Chart catalog   →  10k static index   →  search without API keys
+Your anchor song  +  your intent  →  8-track bridge session
+Review corpus     →  themes + Q&A  →  Discovery Lab + Ask Corpus
 ```
 
-1. **Ingest & index** — Reviews from App Store, Play Store, Reddit, and HN are classified by theme, segment, and sentiment, then embedded for retrieval.
-2. **Bridge planning** — Given an intent and optional anchor track, the planner gathers candidates via Search API (or chart catalog in demo mode) and sequences eight tracks with transition notes.
-3. **Serve** — FastAPI backend on Vercel; static Spotify-inspired UI with single navigation across Home, Bridge Sessions, Discovery Lab, and Ask Corpus.
+1. **You set the starting point** — a track you trust and a direction (“warm indie folk”, “more energy for a run”).
+2. **The planner sequences eight tracks** — each one a small hop, ordered from safe to surprising.
+3. **Discovery Lab & Ask Corpus** — separate layer that turns listener feedback into insight for product thinkers and curious users.
 
-Spotify deprecated `/recommendations` for new developer apps (Nov 2024+). This product uses **Search API + LLM planning** instead — a deliberate constraint that keeps sessions explainable.
+Bridge Sessions uses search-based planning (not black-box recommendation feeds), so every track in a session is intentional and inspectable.
 
 ---
 
@@ -43,7 +44,7 @@ Spotify deprecated `/recommendations` for new developer apps (Nov 2024+). This p
 ```bash
 python -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env   # MOCK_MODE=true works without keys
+cp .env.example .env
 
 export PYTHONPATH=.
 python ingest/seed_corpus.py
@@ -55,8 +56,6 @@ uvicorn api.main:app --reload --port 8000
 bash scripts/smoke_test.sh
 ```
 
-Verify: `curl http://localhost:8000/health` should return `chart_catalog_tracks: 10000` and `catalog_search: true`.
-
 ---
 
 ## Project structure
@@ -64,10 +63,10 @@ Verify: `curl http://localhost:8000/health` should return `chart_catalog_tracks:
 ```
 api/          FastAPI routes (bridge, search, RAG, insights)
 web/          Static UI (Home, Bridge Sessions, Discovery Lab, Ask Corpus)
-mvp/          Spotify OAuth, bridge planner, chart catalog search
+mvp/          Bridge planner, catalog search, Spotify OAuth
 analysis/     Classification, embeddings, clustering, RAG
-ingest/       Review scrapers + seed corpus
-data/         corpus.json, chart_catalog.json (10k tracks)
+ingest/       Review ingestion + seed corpus
+data/         Review corpus + chart catalog
 docs/         Production deployment guide
 ```
 
@@ -77,12 +76,12 @@ docs/         Production deployment guide
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /health` | Status, review count, catalog size |
+| `GET /health` | Service status |
 | `POST /api/bridge` | Generate 8-track bridge session |
-| `GET /api/search?q=` | Track search (chart catalog or Spotify) |
-| `GET /api/insights` | Theme dashboard data |
-| `POST /api/ask` | Custom RAG question |
-| `GET /api/ask/{key}` | Built-in growth questions |
+| `POST /api/bridge/restore` | Restore an exact shared session from track IDs |
+| `GET /api/search/tracks?q=` | Search tracks by name or artist |
+| `GET /api/insights` | Discovery Lab theme data |
+| `POST /api/ask` | Custom Q&A over the review corpus |
 
 Interactive docs: https://spotify-discovery-pm.vercel.app/docs
 
@@ -90,23 +89,7 @@ Interactive docs: https://spotify-discovery-pm.vercel.app/docs
 
 ## Deployment
 
-See [`docs/PRODUCTION.md`](docs/PRODUCTION.md) for Vercel environment variables, Spotify Developer Dashboard setup, and demo vs live mode.
-
-**Demo mode (default):** Works without Spotify or LLM keys — verified track IDs, chart catalog search, heuristic bridge planning.
-
-**Live mode:** Set `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SESSION_SECRET`, and optionally `ANTHROPIC_API_KEY` for OAuth, full catalog search, and Claude bridge planning.
-
----
-
-## Chart catalog
-
-The static catalog (`data/chart_catalog.json`) contains 10,000 unique tracks ranked by popularity — sourced from a public dataset, no Spotify API calls.
-
-Regenerate after updating the source CSV:
-
-```bash
-python scripts/build_chart_catalog.py
-```
+See [`docs/PRODUCTION.md`](docs/PRODUCTION.md) for Vercel setup, environment variables, and optional Spotify OAuth.
 
 ---
 
@@ -114,19 +97,11 @@ python scripts/build_chart_catalog.py
 
 | Variable | Purpose |
 |----------|---------|
-| `MOCK_MODE` | `true` = seed corpus + demo bridge (default locally) |
-| `ALLOW_DEMO_MODE` | `true` = public demo without login (default in production) |
-| `ANTHROPIC_API_KEY` | Claude bridge planner + RAG answers |
-| `SPOTIFY_CLIENT_ID/SECRET` | OAuth + full catalog search |
-| `SESSION_SECRET` | Signed HttpOnly session cookies |
-| `GEMINI_API_KEY` | Optional real embeddings (hash fallback otherwise) |
+| `ALLOW_DEMO_MODE` | Public free mode without login (default in production) |
+| `ANTHROPIC_API_KEY` | Optional — Claude bridge planner + richer Ask answers |
+| `SPOTIFY_CLIENT_ID/SECRET` | Optional — full catalog search + save to playlist |
+| `SESSION_SECRET` | Signed session cookies for OAuth |
 
 ---
 
-## Strategy deck
-
-A product strategy presentation is included at `deck/NL Spotify.pdf` (source: `deck/index.html`).
-
----
-
-Built by [Attideep Raina](https://github.com/attideep). MIT-style use for learning and extension welcome — open an issue if you deploy your own fork.
+Built by [Attideep Raina](https://github.com/attideep). Open an issue if you deploy your own fork.

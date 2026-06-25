@@ -11,7 +11,7 @@ from mvp.demo_tracks import DEMO_TRACKS
 from mvp.oembed import lookup_track_oembed
 from mvp.parse import track_url
 from mvp.spotify_client import SpotifyAPIError, SpotifyClient, normalize_track
-from mvp.track_lookup import enrich_track_meta
+from mvp.track_lookup import enrich_track_meta, lookup_track
 
 
 class BridgeError(Exception):
@@ -332,6 +332,54 @@ def create_bridge_session(
     plan = _plan_with_llm(anchor, candidates, intent)
     session = _build_session(anchor, plan, candidates, intent, mode)
     return session
+
+
+def restore_bridge_session(
+    intent: str,
+    anchor_track_id: str | None,
+    track_ids: list[str],
+) -> BridgeSession:
+    """Rebuild an exact shared session from saved track IDs — no re-planning."""
+    if not intent.strip():
+        raise BridgeError("Describe your listening intent.", "missing_intent")
+    ids = [t.strip() for t in track_ids if t and t.strip()][:8]
+    if len(ids) < 8:
+        raise BridgeError(
+            "Shared link is incomplete — generate a new bridge and copy the link again.",
+            "invalid_share",
+            400,
+        )
+
+    anchor = resolve_anchor(None, anchor_track_id)
+    tracks: list[BridgeTrack] = []
+    for i, tid in enumerate(ids):
+        meta = lookup_track(tid) or {"id": tid, "name": "Unknown track", "artist": ""}
+        meta = enrich_track_meta(meta)
+        tracks.append(
+            BridgeTrack(
+                position=i + 1,
+                track_id=tid,
+                name=meta["name"],
+                artist=meta.get("artist", ""),
+                spotify_url=meta.get("spotify_url") or track_url(tid),
+                album_art=meta.get("album_art", ""),
+                explanation=f"Step {i + 1} in this shared bridge toward “{intent[:60]}”.",
+                novelty_score=round(0.12 + i * 0.11, 2),
+            )
+        )
+
+    anchor_label = (
+        f"{anchor['name']} — {anchor['artist']}"
+        if anchor.get("artist")
+        else anchor["name"]
+    )
+    return BridgeSession(
+        anchor_track=anchor_label,
+        anchor_id=anchor["id"],
+        intent=intent.strip(),
+        tracks=tracks,
+        session_summary="Shared bridge session — same track order as the link you opened.",
+    )
 
 
 def save_bridge_to_playlist(

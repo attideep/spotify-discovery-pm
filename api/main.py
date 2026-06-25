@@ -21,7 +21,7 @@ from mvp.auth import (
     get_login_redirect,
     refreshed_session_cookie,
 )
-from mvp.bridge import BridgeError, create_bridge_session, save_bridge_to_playlist
+from mvp.bridge import BridgeError, create_bridge_session, restore_bridge_session, save_bridge_to_playlist
 from mvp.chart_catalog import catalog_count, search_tracks as chart_search
 from mvp.parse import parse_track_id, resolve_track_query
 from mvp.track_lookup import enrich_track_meta, lookup_track
@@ -65,6 +65,12 @@ class SavePlaylistBody(BaseModel):
     track_ids: list[str]
     anchor_track: str = "Bridge Session"
     intent: str = ""
+
+
+class RestoreBridgeBody(BaseModel):
+    intent: str
+    anchor: str | None = None
+    track_ids: list[str]
 
 
 def _ensure_indexed() -> ReviewStore:
@@ -282,7 +288,7 @@ def api_search_tracks(q: str) -> dict:
     return {
         "tracks": hits,
         "mode": "chart_catalog",
-        "hint": f"Searching {n:,} chart hits — no login required. Add Spotify API keys for the full catalog.",
+        "hint": "Pick a track to set as your anchor — no login required.",
     }
 
 
@@ -318,6 +324,23 @@ def api_bridge(
     if new_cookie:
         resp.set_cookie(**session_cookie_kwargs(new_cookie))
     return resp
+
+
+@app.post("/api/bridge/restore")
+def api_bridge_restore(body: RestoreBridgeBody) -> JSONResponse:
+    tid = resolve_track_query(body.anchor) if body.anchor else None
+    try:
+        session = restore_bridge_session(
+            intent=body.intent,
+            anchor_track_id=tid,
+            track_ids=body.track_ids,
+        )
+    except BridgeError as e:
+        return _bridge_error(e)
+
+    payload = session.model_dump()
+    payload["mode"] = "demo"
+    return JSONResponse(payload)
 
 
 @app.post("/api/bridge/save")

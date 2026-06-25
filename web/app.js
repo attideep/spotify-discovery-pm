@@ -34,9 +34,12 @@ function parseTrackId(raw) {
 }
 
 function buildShareUrl(session) {
-  const qs = new URLSearchParams({ intent: session.intent });
+  const qs = new URLSearchParams();
+  qs.set("intent", session.intent);
   const anchorId = session.anchor_id || session._shareAnchor || parseTrackId(document.getElementById("anchorInput")?.value || "");
   if (anchorId) qs.set("anchor", anchorId);
+  const ids = (session.tracks || []).map(t => t.track_id).filter(Boolean);
+  if (ids.length) qs.set("tracks", ids.join(","));
   return `${location.origin}/#bridge?${qs.toString()}`;
 }
 
@@ -80,11 +83,12 @@ async function tryLoadSharedBridge(shareParams) {
 
   switchTab("bridge", { preserveQuery: true });
   clearBridgeError();
-  toast("Loading shared bridge…");
+  setBridgeLoading(true, "Loading shared bridge…");
 
   if (params.get("share")) {
     try {
       displaySession(decodeShare(params.get("share")));
+      setBridgeLoading(false);
       toast("Shared bridge session loaded");
       return;
     } catch {
@@ -94,20 +98,34 @@ async function tryLoadSharedBridge(shareParams) {
 
   const intent = params.get("intent") || params.get("i");
   if (!intent) {
+    setBridgeLoading(false);
     showBridgeError("Could not load shared bridge — link may be truncated. Generate a new one and copy again.");
     return;
   }
 
   const anchorId = params.get("anchor") || params.get("a");
   const anchor = anchorId ? `https://open.spotify.com/track/${anchorId}` : null;
+  const trackIds = (params.get("tracks") || "")
+    .split(",")
+    .map(s => s.trim())
+    .filter(id => /^[A-Za-z0-9]{22}$/.test(id));
 
   try {
-    const session = await fetchJSON("/api/bridge", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ intent, anchor, demo: !isConnected }),
-    });
-    session._shareAnchor = anchorId || "";
+    let session;
+    if (trackIds.length >= 8) {
+      session = await fetchJSON("/api/bridge/restore", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intent, anchor: anchorId, track_ids: trackIds.slice(0, 8) }),
+      });
+    } else {
+      session = await fetchJSON("/api/bridge", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ intent, anchor, demo: !isConnected }),
+      });
+    }
+    session._shareAnchor = anchorId || session.anchor_id || "";
     document.getElementById("intentInput").value = intent;
     if (anchor) {
       document.getElementById("anchorInput").value = anchor;
@@ -118,6 +136,8 @@ async function tryLoadSharedBridge(shareParams) {
     toast("Shared bridge session loaded");
   } catch (e) {
     showBridgeError(e.message || "Could not load shared bridge.");
+  } finally {
+    setBridgeLoading(false);
   }
 }
 
@@ -167,6 +187,18 @@ function showBridgeError(msg) {
 
 function clearBridgeError() {
   document.getElementById("bridgeError").classList.add("hidden");
+}
+
+function setBridgeLoading(loading, message = "Building your bridge…") {
+  const overlay = document.getElementById("bridgeLoader");
+  const title = document.getElementById("bridgeLoaderTitle");
+  const btn = document.getElementById("buildBtn");
+  if (title) title.textContent = message;
+  overlay?.classList.toggle("hidden", !loading);
+  if (btn) {
+    btn.disabled = loading;
+    btn.setAttribute("aria-busy", loading ? "true" : "false");
+  }
 }
 
 /* ── Tab navigation ── */
@@ -255,7 +287,8 @@ if (["home", "bridge", "insights", "ask"].includes(INITIAL_HASH.tab)) {
   const hasShareQuery = Boolean(
     INITIAL_HASH.params.get("share")
     || INITIAL_HASH.params.get("intent")
-    || INITIAL_HASH.params.get("i"),
+    || INITIAL_HASH.params.get("i")
+    || INITIAL_HASH.params.get("tracks"),
   );
   switchTab(INITIAL_HASH.tab, { preserveQuery: hasShareQuery });
 }
@@ -804,7 +837,7 @@ document.getElementById("buildBtn")?.addEventListener("click", async () => {
   const intent = document.getElementById("intentInput").value.trim();
   if (!intent) return toast("Enter your intent first");
   const anchor = document.getElementById("anchorInput").value.trim() || null;
-  toast("Building your bridge…");
+  setBridgeLoading(true);
 
   try {
     const session = await fetchJSON("/api/bridge", {
@@ -819,6 +852,8 @@ document.getElementById("buildBtn")?.addEventListener("click", async () => {
   } catch (e) {
     showBridgeError(e.message);
     if (e.code === "auth_required") switchTab("bridge");
+  } finally {
+    setBridgeLoading(false);
   }
 });
 

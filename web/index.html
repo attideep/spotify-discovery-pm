@@ -55,7 +55,7 @@
         </div>
         <div class="topbar__search">
           <svg class="topbar__search-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.7 12.3 11 9.6a5.5 5.5 0 1 0-1.4 1.4l2.7 2.7a1 1 0 0 0 1.4-1.4zM6.5 10A3.5 3.5 0 1 1 10 6.5 3.5 3.5 0 0 1 6.5 10z"/></svg>
-          <input type="text" id="globalSearch" placeholder="Search 10,000 chart hits…" autocomplete="off" />
+          <input type="text" id="globalSearch" placeholder="Search songs or artists…" autocomplete="off" />
           <div id="searchResults" class="search-results hidden" role="listbox"></div>
         </div>
         <div class="topbar__user">A</div>
@@ -68,7 +68,7 @@
             <div class="public-banner__text">
               <p class="public-banner__eyebrow">Free · No login · Unlimited</p>
               <h2 class="public-banner__title">Discover music through gradual bridges — not random jumps</h2>
-              <p class="public-banner__desc">AI-planned 8-track journeys from a song you love toward something new. Paste any Spotify track link, explore review insights, or ask our corpus 620+ user voices.</p>
+              <p class="public-banner__desc">AI-planned 8-track journeys from a song you love toward something new. Search any track, explore listener insights, or ask what people really say about music discovery.</p>
             </div>
             <button type="button" class="btn-spotify btn-spotify--green public-banner__cta" data-tab="bridge">Start a bridge session</button>
           </div>
@@ -155,6 +155,13 @@
             <div class="bridge-actions">
               <button id="buildBtn" class="btn-spotify btn-spotify--green">Generate bridge session</button>
               <button id="savePlaylistBtn" class="btn-spotify btn-spotify--ghost hidden">Save to Spotify</button>
+            </div>
+            <div id="bridgeLoader" class="bridge-loader hidden" aria-live="polite" aria-busy="false">
+              <div class="bridge-loader__card">
+                <div class="bridge-loader__spinner" aria-hidden="true"></div>
+                <p class="bridge-loader__title" id="bridgeLoaderTitle">Building your bridge…</p>
+                <p class="bridge-loader__subtitle">Sequencing tracks from familiar to new</p>
+              </div>
             </div>
             <p id="bridgeError" class="bridge-error hidden"></p>
           </div>

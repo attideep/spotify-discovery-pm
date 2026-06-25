@@ -1114,6 +1114,53 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 
 .citation a { color: var(--green); }
 
+.bridge-loader {
+  margin-top: 20px;
+  padding: 28px 24px;
+  border-radius: var(--radius-md);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  text-align: center;
+}
+
+.bridge-loader__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.bridge-loader__spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid rgba(30, 215, 96, 0.2);
+  border-top-color: var(--accent-green);
+  border-radius: 50%;
+  animation: bridge-spin 0.85s linear infinite;
+}
+
+.bridge-loader__title {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-base);
+}
+
+.bridge-loader__subtitle {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-subdued);
+}
+
+@keyframes bridge-spin {
+  to { transform: rotate(360deg); }
+}
+
+.btn-spotify:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 .status-toast {
   position: fixed;
   bottom: calc(var(--player-h) + 16px);
