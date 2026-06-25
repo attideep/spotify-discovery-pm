@@ -2,59 +2,11 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Bridge Sessions — Spotify Discovery MVP</title>
-  <link rel="stylesheet" href="/static/styles.css" />
+  <meta http-equiv="refresh" content="0;url=/#bridge" />
+  <title>Redirecting…</title>
 </head>
 <body>
-  <header class="header">
-    <div class="container header__inner">
-      <a class="logo" href="/">Discovery Engine</a>
-      <nav>
-        <a href="/">Review Analysis</a>
-        <a href="/bridge.html" class="active">Bridge Sessions</a>
-      </nav>
-    </div>
-  </header>
-
-  <main class="container">
-    <section class="hero">
-      <h1>Bridge Sessions</h1>
-      <p class="lede">An AI-native listening journey from your comfort zone toward novel artists — with explainable transitions traditional recsys can't provide.</p>
-      <div class="actions">
-        <a id="spotifyLogin" class="btn btn--primary" href="/mvp/login">Connect Spotify</a>
-        <button id="demoBtn" class="btn btn--ghost">Try demo mode</button>
-      </div>
-    </section>
-
-    <section class="card">
-      <h2>Build your bridge</h2>
-      <label>Anchor track ID (optional)</label>
-      <input id="anchorInput" type="text" placeholder="Spotify track ID or leave blank for top track" />
-      <label>Your intent</label>
-      <textarea id="intentInput" rows="3" placeholder="Like Khruangbin but more energetic for a morning run"></textarea>
-      <button id="buildBtn" class="btn btn--primary">Generate 8-track bridge</button>
-    </section>
-
-    <section id="session" class="card hidden">
-      <h2 id="sessionTitle"></h2>
-      <p id="sessionSummary" class="lede"></p>
-      <div id="tracks"></div>
-    </section>
-
-    <section class="card">
-      <h2>Why AI?</h2>
-      <table class="compare">
-        <thead><tr><th>Collaborative filtering</th><th>Bridge Sessions</th></tr></thead>
-        <tbody>
-          <tr><td>Optimizes play probability</td><td>Optimizes understood novelty</td></tr>
-          <tr><td>Black-box rankings</td><td>Explains each transition</td></tr>
-          <tr><td>Batch playlists (weekly)</td><td>Real-time, mood-aware</td></tr>
-          <tr><td>Same genre cluster</td><td>Controlled distance from anchor</td></tr>
-        </tbody>
-      </table>
-    </section>
-  </main>
-  <script src="/static/bridge.js"></script>
+  <p>Redirecting to <a href="/#bridge">Bridge Sessions</a>…</p>
+  <script>location.replace("/#bridge");</script>
 </body>
 </html>

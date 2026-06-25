@@ -126,7 +126,7 @@ def mvp_login() -> RedirectResponse:
 @app.get("/mvp/callback")
 def mvp_callback(code: str, state: str = "") -> RedirectResponse:
     token = handle_callback(code)
-    return RedirectResponse(f"/bridge.html?token={token['access_token']}")
+    return RedirectResponse(f"/?token={token['access_token']}#bridge")
 
 
 @app.get("/mvp/demo-token")

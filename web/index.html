@@ -3,69 +3,214 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Spotify Review Discovery Engine</title>
+  <title>Spotify — Bridge Sessions</title>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
 <body>
-  <header class="header">
-    <div class="container header__inner">
-      <a class="logo" href="/">Discovery Engine</a>
-      <nav>
-        <a href="/">Review Analysis</a>
-        <a href="/bridge.html">Bridge Sessions</a>
-        <a href="/docs" target="_blank">API Docs</a>
+  <div class="app">
+    <!-- Sidebar -->
+    <aside class="sidebar">
+      <div class="sidebar__logo">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="#1ed760"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
+        <span class="sidebar__logo-text">Spotify</span>
+        <span class="sidebar__badge">Bridge Beta</span>
+      </div>
+
+      <nav class="sidebar__nav">
+        <button class="nav-item active" data-tab="home">
+          <svg viewBox="0 0 24 24"><path d="M12.5 3.247a1 1 0 0 0-1 0L4 7.577V20h4.5v-8.5a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1V20H20V7.577l-7.5-4.33z"/></svg>
+          <span>Home</span>
+        </button>
+        <button class="nav-item" data-tab="bridge">
+          <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+          <span>Bridge Sessions</span>
+        </button>
+        <button class="nav-item" data-tab="insights">
+          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
+          <span>Discovery Lab</span>
+        </button>
+        <button class="nav-item" data-tab="ask">
+          <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+          <span>Ask Corpus</span>
+        </button>
       </nav>
+
+      <p class="sidebar__section-label">Your shortcuts</p>
+      <div class="sidebar__list">
+        <div class="sidebar__list-item" data-tab="bridge">
+          <div class="sidebar__list-icon sidebar__list-icon--green">🌉</div>
+          <span>Bridge Sessions</span>
+        </div>
+        <div class="sidebar__list-item" data-tab="insights">
+          <div class="sidebar__list-icon sidebar__list-icon--cool">📊</div>
+          <span>User Voice Insights</span>
+        </div>
+        <div class="sidebar__list-item" data-tab="ask">
+          <div class="sidebar__list-icon sidebar__list-icon--warm">💬</div>
+          <span>Discovery Q&amp;A</span>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <div class="main" data-accent="home" id="mainArea">
+      <header class="topbar">
+        <div class="topbar__nav-btns">
+          <button class="icon-btn" disabled aria-label="Back">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M9.7 3.3a1 1 0 0 0-1.4 1.4L10.6 7H3a1 1 0 1 0 0 2h7.6L8.3 11.3a1 1 0 1 0 1.4 1.4l4-4a1 1 0 0 0 0-1.4l-4-4z" transform="rotate(180 8 8)"/></svg>
+          </button>
+          <button class="icon-btn" disabled aria-label="Forward">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M9.7 3.3a1 1 0 0 0-1.4 1.4L10.6 7H3a1 1 0 1 0 0 2h7.6L8.3 11.3a1 1 0 1 0 1.4 1.4l4-4a1 1 0 0 0 0-1.4l-4-4z"/></svg>
+          </button>
+        </div>
+        <div class="topbar__search">
+          <svg class="topbar__search-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.7 12.3 11 9.6a5.5 5.5 0 1 0-1.4 1.4l2.7 2.7a1 1 0 0 0 1.4-1.4zM6.5 10A3.5 3.5 0 1 1 10 6.5 3.5 3.5 0 0 1 6.5 10z"/></svg>
+          <input type="text" id="globalSearch" placeholder="What do you want to play?" />
+        </div>
+        <div class="topbar__user">A</div>
+      </header>
+
+      <div class="content">
+        <!-- HOME -->
+        <section class="panel active" id="panel-home">
+          <h1 class="greeting">Good evening</h1>
+          <div class="stats-row" id="statsRow">
+            <div class="stat-pill"><div class="stat-pill__value" id="statReviews">—</div><div class="stat-pill__label">Reviews analyzed</div></div>
+            <div class="stat-pill"><div class="stat-pill__value" id="statThemes">—</div><div class="stat-pill__label">Discovery themes</div></div>
+            <div class="stat-pill"><div class="stat-pill__value">8</div><div class="stat-pill__label">Tracks per bridge</div></div>
+          </div>
+
+          <div class="section-header"><h2>Made for your discovery journey</h2></div>
+          <div class="card-grid">
+            <article class="media-card" data-tab="bridge">
+              <div class="media-card__cover"><div class="cover-gradient" style="background:linear-gradient(135deg,#1ed760,#121212)">🌉</div>
+                <button class="media-card__play" aria-label="Open Bridge"><svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5v11l10-5.5L3 2.5z"/></svg></button>
+              </div>
+              <p class="media-card__title">Bridge Sessions</p>
+              <p class="media-card__desc">Gradual paths from familiar to novel — with AI explanations</p>
+            </article>
+            <article class="media-card" data-tab="insights">
+              <div class="media-card__cover"><div class="cover-gradient" style="background:linear-gradient(135deg,#509bf5,#121212)">📊</div>
+                <button class="media-card__play" aria-label="Open Insights"><svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5v11l10-5.5L3 2.5z"/></svg></button>
+              </div>
+              <p class="media-card__title">Discovery Lab</p>
+              <p class="media-card__desc">553+ user voices — themes, segments, pain points</p>
+            </article>
+            <article class="media-card" data-tab="ask">
+              <div class="media-card__cover"><div class="cover-gradient" style="background:linear-gradient(135deg,#e91429,#121212)">💬</div>
+                <button class="media-card__play" aria-label="Ask"><svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5v11l10-5.5L3 2.5z"/></svg></button>
+              </div>
+              <p class="media-card__title">Ask the Corpus</p>
+              <p class="media-card__desc">RAG-powered answers with cited user quotes</p>
+            </article>
+          </div>
+
+          <div class="section-header"><h2>Recently analyzed</h2><a href="#" data-tab="insights">Show all</a></div>
+          <div class="card-grid" id="homeThemes"></div>
+        </section>
+
+        <!-- BRIDGE -->
+        <section class="panel" id="panel-bridge">
+          <div class="bridge-hero">
+            <div class="bridge-hero__art">
+              <svg viewBox="0 0 24 24" fill="white"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+            </div>
+            <div>
+              <p class="bridge-hero__type">AI-native · Beta</p>
+              <h1 class="bridge-hero__title">Bridge Sessions</h1>
+              <p class="bridge-hero__desc">A 30-minute listening journey from your comfort zone toward novel artists. Each track comes with an explanation — so discovery feels safe, not random.</p>
+              <div class="bridge-actions">
+                <a id="spotifyLogin" class="btn-spotify btn-spotify--green" href="/mvp/login">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg>
+                  Connect Spotify
+                </a>
+                <button id="demoBtn" class="btn-spotify btn-spotify--ghost">Try demo</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="bridge-form">
+            <label class="form-label">Anchor track (optional)</label>
+            <input class="form-input" id="anchorInput" type="text" placeholder="Paste Spotify track ID — or leave blank for your top track" />
+            <label class="form-label">Your intent</label>
+            <textarea class="form-input" id="intentInput" rows="2" placeholder="Like Khruangbin but more energetic for a morning run"></textarea>
+            <button id="buildBtn" class="btn-spotify btn-spotify--green">Generate bridge session</button>
+          </div>
+
+          <div id="sessionBlock" class="hidden">
+            <div class="section-header"><h2 id="sessionTitle">Your bridge</h2></div>
+            <p id="sessionSummary" style="color:var(--text-subdued);margin:-8px 0 16px;font-size:14px"></p>
+            <div class="track-list-header">
+              <span>#</span><span>Title</span><span>Novelty</span><span></span><span></span>
+            </div>
+            <div id="tracks"></div>
+          </div>
+        </section>
+
+        <!-- INSIGHTS -->
+        <section class="panel" id="panel-insights">
+          <h1 class="greeting" style="font-size:32px">Discovery Lab</h1>
+          <p style="color:var(--text-subdued);margin:-16px 0 24px">AI analysis of 553+ App Store, Play Store &amp; forum reviews</p>
+          <div class="bridge-actions" style="margin-bottom:24px">
+            <button id="runIngest" class="btn-spotify btn-spotify--green">Run analysis</button>
+            <button id="loadInsights" class="btn-spotify btn-spotify--ghost">Refresh</button>
+          </div>
+          <div class="insight-grid">
+            <div><h3 style="font-size:16px;margin:0 0 16px">Themes</h3><div id="themes"></div></div>
+            <div><h3 style="font-size:16px;margin:0 0 16px">User segments</h3><div id="segments"></div></div>
+          </div>
+        </section>
+
+        <!-- ASK -->
+        <section class="panel ask-panel" id="panel-ask">
+          <h1 class="greeting" style="font-size:32px">Ask the corpus</h1>
+          <p style="color:var(--text-subdued);margin:-16px 0 8px">Six canonical growth questions — or ask your own</p>
+          <div id="canonicalBtns" class="chip-row"></div>
+          <div style="display:flex;gap:12px">
+            <input class="form-input" id="questionInput" type="text" placeholder="Why do users repeat the same playlists?" style="margin:0" />
+            <button id="askBtn" class="btn-spotify btn-spotify--green" style="white-space:nowrap">Ask</button>
+          </div>
+          <div id="answer" class="answer-box hidden"></div>
+        </section>
+      </div>
     </div>
-  </header>
 
-  <main class="container">
-    <section class="hero">
-      <h1>AI-Powered Review Discovery Engine</h1>
-      <p class="lede">Analyze App Store, Play Store, Reddit, and forum feedback at scale to understand why Spotify users struggle with music discovery.</p>
-      <div class="actions">
-        <button id="runIngest" class="btn btn--primary">Run analysis on corpus</button>
-        <button id="loadInsights" class="btn btn--ghost">Refresh insights</button>
+    <!-- Player bar -->
+    <footer class="now-playing">
+      <div class="now-playing__track">
+        <div class="now-playing__art" id="playerArt"></div>
+        <div class="now-playing__meta">
+          <div class="now-playing__title" id="playerTitle">Select a bridge session</div>
+          <div class="now-playing__artist" id="playerArtist">Bridge Sessions · Beta</div>
+        </div>
       </div>
-      <p id="status" class="status"></p>
-    </section>
-
-    <section class="grid-2">
-      <div class="card">
-        <h2>Theme dashboard</h2>
-        <div id="themes"></div>
+      <div class="now-playing__controls">
+        <div class="now-playing__btns">
+          <button class="icon-btn" style="width:28px;height:28px;background:transparent" aria-label="Shuffle">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.151 1.533a2.205 2.205 0 0 1 3.083 3.083l-3.083 3.083-1.061-1.061 3.083-3.022a.705.705 0 0 0-.997-.997L11.5 4.455 10.439 3.393l2.712-2.86zM2.205 1.533l3.083 3.083-1.061 1.061L1.144 2.594A.705.705 0 0 0 2.14 1.533zm0 12.934 3.083-3.083 1.061 1.061-3.083 3.083a2.205 2.205 0 0 1-3.083-3.083zm11.79 0a2.205 2.205 0 0 1-3.083 0l-3.083-3.083 1.061-1.061 3.083 3.083a.705.705 0 0 0 .997-.997L11.5 11.545l1.061-1.061 2.712 2.983z"/></svg>
+          </button>
+          <button class="now-playing__play" id="playerPlay" aria-label="Play">
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5v11l10-5.5L3 2.5z"/></svg>
+          </button>
+          <button class="icon-btn" style="width:28px;height:28px;background:transparent" aria-label="Repeat">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 4.75A3.75 3.75 0 0 1 3.75 1h8.5A3.75 3.75 0 0 1 16 4.75v5a3.75 3.75 0 0 1-3.75 3.75H9.81l1.018 1.018a.75.75 0 1 1-1.06 1.06L6.939 12.75l2.829-2.828a.75.75 0 1 1 1.06 1.06L9.811 12h2.439a2.25 2.25 0 0 0 2.25-2.25v-5a2.25 2.25 0 0 0-2.25-2.25h-8.5A2.25 2.25 0 0 0 1.5 4.75v5A2.25 2.25 0 0 0 3.75 12H5v1.5H3.75A3.75 3.75 0 0 1 0 9.75v-5z"/></svg>
+          </button>
+        </div>
+        <div class="now-playing__progress">
+          <span id="playerTime">0:00</span>
+          <div class="now-playing__bar"><div class="now-playing__bar-fill" id="playerProgress"></div></div>
+          <span>30:00</span>
+        </div>
       </div>
-      <div class="card">
-        <h2>User segments</h2>
-        <div id="segments"></div>
+      <div class="now-playing__extras">
+        <button class="icon-btn" style="background:transparent;width:28px;height:28px" aria-label="Queue">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M15 15H1v-1.5h14V15zm0-4.5H1V9h14v1.5zm-14-7A2.5 2.5 0 0 1 3.5 1h9a2.5 2.5 0 0 1 0 5h-9A2.5 2.5 0 0 1 1 3.5zm2.5-1a1 1 0 0 0 0 2h9a1 1 0 0 0 0-2h-9z"/></svg>
+        </button>
       </div>
-    </section>
+    </footer>
+  </div>
 
-    <section class="card">
-      <h2>Ask the corpus</h2>
-      <p class="hint">Six canonical growth questions — or ask your own.</p>
-      <div id="canonicalBtns" class="chip-row"></div>
-      <div class="ask-row">
-        <input id="questionInput" type="text" placeholder="Why do users repeat the same playlists?" />
-        <button id="askBtn" class="btn btn--primary">Ask</button>
-      </div>
-      <div id="answer" class="answer"></div>
-    </section>
-
-    <section class="card workflow">
-      <h2>Workflow overview</h2>
-      <ol class="workflow-steps">
-        <li><strong>Ingest</strong> — App Store, Play Store, Reddit, Hacker News</li>
-        <li><strong>Normalize</strong> — unified schema with source metadata</li>
-        <li><strong>Classify</strong> — LLM themes, segments, sentiment</li>
-        <li><strong>Embed + index</strong> — vector store for semantic search</li>
-        <li><strong>RAG Q&amp;A</strong> — cited answers to discovery questions</li>
-      </ol>
-    </section>
-  </main>
-
-  <footer class="footer container">
-    <p>Spotify Growth PM — Part 1 Review Discovery Engine</p>
-  </footer>
+  <div class="status-toast" id="statusToast"></div>
   <script src="/static/app.js"></script>
 </body>
 </html>
