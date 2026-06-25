@@ -11,3 +11,4 @@ data/*.db
 .DS_Store
 .vercel/
 node_modules/
+.vercel
