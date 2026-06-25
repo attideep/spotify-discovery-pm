@@ -2,13 +2,13 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>Spotify — Bridge Sessions</title>
   <style>
-    /* critical fallback if CDN/static hiccups */
-    html,body{height:100%;margin:0;background:#000;color:#fff}
+    html,body{height:100%;margin:0;background:#000;color:#fff;overflow:hidden}
     .panel:not(.active){display:none!important}
-    .app{display:grid;grid-template-columns:240px 1fr;grid-template-rows:1fr 72px;height:100vh;overflow:hidden}
+    .app{display:grid;grid-template-columns:1fr;grid-template-rows:1fr auto auto;height:100dvh;overflow:hidden}
+    @media (min-width:769px){.app{grid-template-columns:240px 1fr;grid-template-rows:1fr 72px}}
   </style>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
@@ -195,9 +195,9 @@
           <h1 class="greeting" style="font-size:32px">Ask the corpus</h1>
           <p style="color:var(--text-subdued);margin:-16px 0 8px">Six canonical growth questions — or ask your own</p>
           <div id="canonicalBtns" class="chip-row"></div>
-          <div style="display:flex;gap:12px">
-            <input class="form-input" id="questionInput" type="text" placeholder="Why do users repeat the same playlists?" style="margin:0" />
-            <button id="askBtn" class="btn-spotify btn-spotify--green" style="white-space:nowrap">Ask</button>
+          <div class="ask-form">
+            <input class="form-input" id="questionInput" type="text" placeholder="Why do users repeat the same playlists?" />
+            <button id="askBtn" class="btn-spotify btn-spotify--green">Ask</button>
           </div>
           <div id="answer" class="answer-box hidden"></div>
         </section>
