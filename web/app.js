@@ -768,10 +768,11 @@ const GRADIENTS = [
 ];
 
 function trackThumbHtml(t, i) {
+  const grad = GRADIENTS[i % GRADIENTS.length];
   if (t.album_art) {
-    return `<div class="track-row__thumb"><img src="${t.album_art}" alt="" loading="lazy" /></div>`;
+    return `<div class="track-row__thumb"><img src="${t.album_art}" alt="" loading="lazy" onerror="this.parentElement.classList.add('track-row__thumb--fallback');this.parentElement.style.background='${grad}';this.replaceWith(document.createTextNode('♪'));" /></div>`;
   }
-  return `<div class="track-row__thumb track-row__thumb--fallback" style="background:${GRADIENTS[i % GRADIENTS.length]}">♪</div>`;
+  return `<div class="track-row__thumb track-row__thumb--fallback" style="background:${grad}">♪</div>`;
 }
 
 function updatePlayer(track, idx) {

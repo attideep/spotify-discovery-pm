@@ -533,24 +533,12 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 
 /* ── Bridge panel ── */
 .bridge-hero {
-  display: grid;
-  grid-template-columns: 180px 1fr;
-  gap: 16px;
-  align-items: end;
   padding: 8px 0 16px;
 }
 
-.bridge-hero__art {
-  width: 180px;
-  height: 180px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, #1ed760 0%, #169c46 50%, #121212 100%);
-  box-shadow: 0 4px 60px rgba(30,215,96,0.3);
-  display: grid;
-  place-items: center;
+.bridge-hero__content {
+  max-width: 640px;
 }
-
-.bridge-hero__art svg { width: 80px; height: 80px; opacity: 0.9; }
 
 .bridge-hero__type {
   font-size: 12px;
@@ -866,8 +854,6 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 
 @media (max-width: 900px) {
   .insight-grid { grid-template-columns: 1fr; }
-  .bridge-hero { grid-template-columns: 1fr; }
-  .bridge-hero__art { width: 192px; height: 192px; }
 }
 
 .theme-card {
@@ -1370,8 +1356,6 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   .sidebar { padding: 8px 4px; }
   .nav-item { justify-content: center; padding: 10px; }
   .content { padding: 0 12px 72px; }
-  .bridge-hero { grid-template-columns: 1fr; }
-  .bridge-hero__art { width: 140px; height: 140px; }
   .track-list-header { display: none; }
   .track-row { grid-template-columns: 32px 1fr 40px; }
   .track-row__novelty { display: none; }
