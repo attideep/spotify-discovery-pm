@@ -10,6 +10,8 @@ export MOCK_MODE=false
 export ALLOW_DEMO_MODE=true
 export PYTHONPATH=.
 
+python scripts/verify_demo_tracks.py
+
 python ingest/seed_corpus.py
 python -c "
 from analysis.store import ReviewStore
