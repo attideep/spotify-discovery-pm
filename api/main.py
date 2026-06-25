@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Cookie, FastAPI, HTTPException, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -15,17 +15,33 @@ from analysis.store import ReviewStore
 from discovery.config import get_settings
 from ingest.normalize import load_corpus
 from ingest.seed_corpus import build_seed_corpus
-from mvp.bridge import create_bridge_session, get_auth_url, handle_callback
+from mvp.auth import (
+    client_from_session,
+    exchange_callback,
+    get_login_redirect,
+    refreshed_session_cookie,
+)
+from mvp.bridge import BridgeError, create_bridge_session, save_bridge_to_playlist
+from mvp.parse import parse_track_id
+from mvp.session import (
+    COOKIE_OAUTH,
+    COOKIE_SESSION,
+    clear_cookie,
+    oauth_cookie_kwargs,
+    session_cookie_kwargs,
+)
+from mvp.spotify_client import SpotifyAPIError, normalize_track
 
 app = FastAPI(
     title="Spotify Discovery Engine",
     description="AI-powered review analysis + Bridge Sessions MVP",
-    version="1.0.0",
+    version="2.0.0",
 )
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -39,8 +55,14 @@ class AskBody(BaseModel):
 
 class BridgeBody(BaseModel):
     intent: str
-    anchor_track_id: str | None = None
-    access_token: str | None = None
+    anchor: str | None = None
+    demo: bool = False
+
+
+class SavePlaylistBody(BaseModel):
+    track_ids: list[str]
+    anchor_track: str = "Bridge Session"
+    intent: str = ""
 
 
 def _ensure_indexed() -> ReviewStore:
@@ -57,6 +79,20 @@ def _ensure_indexed() -> ReviewStore:
     return store
 
 
+def _bridge_error(exc: BridgeError) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status,
+        content={"error": str(exc), "code": exc.code},
+    )
+
+
+def _spotify_error(exc: SpotifyAPIError) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status or 502,
+        content={"error": str(exc), "code": exc.code},
+    )
+
+
 @app.on_event("startup")
 def startup() -> None:
     _ensure_indexed()
@@ -64,8 +100,15 @@ def startup() -> None:
 
 @app.get("/health")
 def health() -> dict:
+    settings = get_settings()
     store = ReviewStore()
-    return {"status": "ok", "reviews_indexed": store.count(), "mock_mode": get_settings().mock_mode}
+    return {
+        "status": "ok",
+        "reviews_indexed": store.count(),
+        "spotify_configured": settings.spotify_configured,
+        "llm_configured": bool(settings.anthropic_api_key),
+        "allow_demo_mode": settings.allow_demo_mode,
+    }
 
 
 @app.post("/api/ingest")
@@ -116,32 +159,194 @@ def api_ask_canonical(question_key: str) -> dict:
     return resp.model_dump()
 
 
-# --- Bridge Sessions MVP ---
+# --- Auth ---
+
+@app.get("/api/auth/status")
+def auth_status(bridge_session: str | None = Cookie(default=None, alias=COOKIE_SESSION)) -> dict:
+    settings = get_settings()
+    client = client_from_session(bridge_session)
+    if client:
+        try:
+            me = client.me()
+            return {
+                "connected": True,
+                "display_name": me.get("display_name") or me.get("id"),
+                "demo": False,
+            }
+        except SpotifyAPIError:
+            return {"connected": False, "demo": False, "spotify_configured": settings.spotify_configured}
+    return {
+        "connected": False,
+        "demo": settings.allow_demo_mode,
+        "spotify_configured": settings.spotify_configured,
+    }
+
 
 @app.get("/mvp/login")
-def mvp_login() -> RedirectResponse:
-    return RedirectResponse(get_auth_url())
+def mvp_login(response: Response) -> RedirectResponse:
+    try:
+        url, oauth_val = get_login_redirect()
+    except SpotifyAPIError as e:
+        raise HTTPException(503, str(e)) from e
+    resp = RedirectResponse(url)
+    resp.set_cookie(**oauth_cookie_kwargs(oauth_val))
+    return resp
 
 
 @app.get("/mvp/callback")
-def mvp_callback(code: str, state: str = "") -> RedirectResponse:
-    token = handle_callback(code)
-    return RedirectResponse(f"/?token={token['access_token']}#bridge")
+def mvp_callback(
+    response: Response,
+    code: str,
+    state: str = "",
+    bridge_oauth: str | None = Cookie(default=None, alias=COOKIE_OAUTH),
+) -> RedirectResponse:
+    try:
+        session_val = exchange_callback(code, state, bridge_oauth)
+    except SpotifyAPIError as e:
+        return RedirectResponse(f"/#bridge?error={e.code}")
+    resp = RedirectResponse("/#bridge")
+    resp.set_cookie(**session_cookie_kwargs(session_val))
+    resp.set_cookie(**clear_cookie(COOKIE_OAUTH))
+    return resp
+
+
+@app.post("/mvp/logout")
+def mvp_logout(response: Response) -> dict:
+    resp = JSONResponse({"ok": True})
+    resp.set_cookie(**clear_cookie(COOKIE_SESSION))
+    return resp
 
 
 @app.get("/mvp/demo-token")
 def mvp_demo_token() -> dict:
-    return {"access_token": "demo", "demo_mode": True}
+    settings = get_settings()
+    if not settings.allow_demo_mode:
+        raise HTTPException(403, "Demo mode disabled")
+    return {"demo_mode": True}
+
+
+# --- Bridge ---
+
+@app.get("/api/track/{track_ref:path}")
+def api_track_lookup(track_ref: str) -> dict:
+    tid = parse_track_id(track_ref)
+    if not tid:
+        raise HTTPException(400, "Invalid Spotify track URL or ID")
+    settings = get_settings()
+    if settings.spotify_configured:
+        try:
+            from mvp.demo_tracks import DEMO_TRACKS
+
+            # Use client credentials-less public track lookup requires user token;
+            # for lookup without auth, validate against demo list or require session
+            for d in DEMO_TRACKS:
+                if d["id"] == tid:
+                    return {**d, "spotify_url": f"https://open.spotify.com/track/{tid}"}
+        except Exception:
+            pass
+    from mvp.demo_tracks import DEMO_TRACKS
+
+    for d in DEMO_TRACKS:
+        if d["id"] == tid:
+            return {**d, "spotify_url": f"https://open.spotify.com/track/{tid}"}
+    raise HTTPException(404, "Track not found — connect Spotify for full catalog lookup")
+
+
+@app.post("/api/track/lookup")
+def api_track_lookup_post(
+    body: dict,
+    bridge_session: str | None = Cookie(default=None, alias=COOKIE_SESSION),
+) -> dict:
+    raw = body.get("anchor", "")
+    tid = parse_track_id(raw)
+    if not tid:
+        raise HTTPException(400, "Paste a valid Spotify track link or ID")
+
+    client = client_from_session(bridge_session)
+    if client:
+        try:
+            return normalize_track(client.get_track(tid))
+        except SpotifyAPIError as e:
+            raise HTTPException(e.status or 502, str(e)) from e
+
+    from mvp.demo_tracks import DEMO_TRACKS
+
+    for d in DEMO_TRACKS:
+        if d["id"] == tid:
+            return {**d, "spotify_url": f"https://open.spotify.com/track/{tid}"}
+    raise HTTPException(404, "Track not found. Connect Spotify to look up any track.")
 
 
 @app.post("/api/bridge")
-def api_bridge(body: BridgeBody) -> dict:
-    session = create_bridge_session(
+def api_bridge(
+    body: BridgeBody,
+    bridge_session: str | None = Cookie(default=None, alias=COOKIE_SESSION),
+) -> JSONResponse:
+    tid = parse_track_id(body.anchor) if body.anchor else None
+    client = None if body.demo else client_from_session(bridge_session)
+
+    try:
+        session = create_bridge_session(
+            intent=body.intent,
+            anchor_track_id=tid,
+            client=client,
+            force_demo=body.demo,
+        )
+    except BridgeError as e:
+        return _bridge_error(e)
+    except SpotifyAPIError as e:
+        return _spotify_error(e)
+
+    payload = session.model_dump()
+    payload["mode"] = "demo" if body.demo or not client else "live"
+    resp = JSONResponse(payload)
+    new_cookie = refreshed_session_cookie(bridge_session)
+    if new_cookie:
+        resp.set_cookie(**session_cookie_kwargs(new_cookie))
+    return resp
+
+
+@app.post("/api/bridge/save")
+def api_bridge_save(
+    body: SavePlaylistBody,
+    bridge_session: str | None = Cookie(default=None, alias=COOKIE_SESSION),
+) -> JSONResponse:
+    client = client_from_session(bridge_session)
+    if not client:
+        return JSONResponse(
+            status_code=401,
+            content={"error": "Connect Spotify to save playlists.", "code": "auth_required"},
+        )
+    from discovery.models import BridgeSession, BridgeTrack
+
+    tracks = [
+        BridgeTrack(
+            position=i + 1,
+            track_id=tid,
+            name="",
+            artist="",
+            spotify_url=f"https://open.spotify.com/track/{tid}",
+            explanation="",
+            novelty_score=0,
+        )
+        for i, tid in enumerate(body.track_ids)
+    ]
+    session = BridgeSession(
+        anchor_track=body.anchor_track,
         intent=body.intent,
-        anchor_track_id=body.anchor_track_id,
-        access_token=body.access_token or "demo",
+        tracks=tracks,
+        session_summary="",
     )
-    return session.model_dump()
+    try:
+        result = save_bridge_to_playlist(client, session)
+    except SpotifyAPIError as e:
+        return _spotify_error(e)
+
+    resp = JSONResponse(result)
+    new_cookie = refreshed_session_cookie(bridge_session)
+    if new_cookie:
+        resp.set_cookie(**session_cookie_kwargs(new_cookie))
+    return resp
 
 
 if WEB_DIR.exists():

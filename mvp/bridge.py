@@ -1,171 +1,244 @@
 from __future__ import annotations
 
-import base64
-import hashlib
 import json
-import secrets
-import urllib.parse
+import re
 from typing import Any
-
-import httpx
 
 from discovery.config import get_settings
 from discovery.models import BridgeSession, BridgeTrack
-
-_oauth_states: dict[str, str] = {}
-
-DEMO_TRACKS = [
-    ("4cOdKETwRBC7tOlA0CdWr6", "Khruangbin", "Time (You and I)"),
-    ("3bidbhpQGRsR7zRPHmjlF3", "Tame Impala", "The Less I Know The Better"),
-    ("6habFtsirITryhBrJXrzoa", "Bon Iver", "Holocene"),
-    ("2LawezPeJ4qb7b4K9KlzAk", "Khruangbin", "Maria También"),
-    ("1NeQ9YStIb1K3JHWxSDMJo", "Unknown Mortal Orchestra", "Multi-Love"),
-    ("0AqQUcf2XJdPhX1PvvdPD0", "Men I Trust", "Show Me How"),
-    ("5TxXWhM2ypJ2G1kSqQy8Kf", "Mac DeMarco", "Chamber Of Reflection"),
-    ("3bUuKaC4W8AcE9bQ4Bq9bK", "Crumb", "Balloon"),
-]
+from mvp.demo_tracks import DEMO_TRACKS
+from mvp.parse import track_url
+from mvp.spotify_client import SpotifyAPIError, SpotifyClient, normalize_track
 
 
-def _pkce_pair() -> tuple[str, str]:
-    verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).decode().rstrip("=")
-    challenge = base64.urlsafe_b64encode(
-        hashlib.sha256(verifier.encode()).digest()
-    ).decode().rstrip("=")
-    return verifier, challenge
+class BridgeError(Exception):
+    def __init__(self, message: str, code: str = "bridge_error", status: int = 400):
+        super().__init__(message)
+        self.code = code
+        self.status = status
 
 
-def get_auth_url() -> str:
+def _dedupe_candidates(candidates: list[dict], exclude_ids: set[str]) -> list[dict]:
+    seen: set[str] = set()
+    out = []
+    for c in candidates:
+        tid = c["id"]
+        if tid in seen or tid in exclude_ids:
+            continue
+        seen.add(tid)
+        out.append(c)
+    return out
+
+
+def _gather_candidates(client: SpotifyClient | None, anchor: dict, intent: str) -> list[dict]:
+    """Search-based discovery (Recommendations API blocked for new Spotify apps)."""
+    pool: list[dict] = []
+
+    if client:
+        artist_names = anchor.get("artist", "").split(",")[0].strip()
+        queries = [
+            f'artist:"{artist_names}"',
+            intent[:80],
+            f"{artist_names} similar",
+            f"{artist_names} indie",
+        ]
+        for q in queries:
+            try:
+                for t in client.search_tracks(q, limit=8):
+                    pool.append(normalize_track(t))
+            except SpotifyAPIError:
+                continue
+
+        # Artist top tracks for related artists found in search
+        try:
+            for artist in client.search_artists(artist_names, limit=2):
+                for t in client.artist_top_tracks(artist["id"])[:5]:
+                    pool.append(normalize_track(t))
+        except SpotifyAPIError:
+            pass
+
+    # Always merge verified demo pool as fallback enrichment
+    for d in DEMO_TRACKS:
+        pool.append({**d, "spotify_url": track_url(d["id"]), "uri": f"spotify:track:{d['id']}"})
+
+    return _dedupe_candidates(pool, {anchor["id"]})
+
+
+def _plan_with_llm(
+    anchor: dict,
+    candidates: list[dict],
+    intent: str,
+) -> list[dict]:
     settings = get_settings()
-    verifier, challenge = _pkce_pair()
-    state = secrets.token_urlsafe(16)
-    _oauth_states[state] = verifier
-    params = {
-        "client_id": settings.spotify_client_id or "demo",
-        "response_type": "code",
-        "redirect_uri": settings.spotify_redirect_uri,
-        "scope": "user-top-read user-read-private playlist-modify-public",
-        "state": state,
-        "code_challenge_method": "S256",
-        "code_challenge": challenge,
-    }
-    return "https://accounts.spotify.com/authorize?" + urllib.parse.urlencode(params)
+    if not settings.anthropic_api_key:
+        return _plan_heuristic(anchor, candidates, intent)
+
+    import anthropic
+
+    catalog = [
+        {
+            "id": c["id"],
+            "name": c["name"],
+            "artist": c["artist"],
+        }
+        for c in candidates[:40]
+    ]
+    prompt = f"""You are Bridge Sessions — an AI music discovery agent for Spotify.
+
+Build an 8-track listening bridge from ANCHOR toward novel music matching the user's intent.
+Pick exactly 8 track IDs from CATALOG only (never invent IDs).
+Order tracks by gradual novelty (low → high). Anchor is step 0 context, not in the 8.
+
+ANCHOR: {anchor["name"]} by {anchor["artist"]} (id: {anchor["id"]})
+INTENT: {intent}
+
+CATALOG:
+{json.dumps(catalog, indent=2)}
+
+Return JSON only:
+{{"tracks": [{{"id": "...", "explanation": "one sentence why this transition works", "novelty_score": 0.0-1.0}}]}}
+Must be exactly 8 tracks, all IDs from catalog."""
+
+    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+    msg = client.messages.create(
+        model="claude-3-5-haiku-20241022",
+        max_tokens=1200,
+        messages=[{"role": "user", "content": prompt}],
+    )
+    raw = msg.content[0].text
+    try:
+        data = json.loads(re.search(r"\{.*\}", raw, re.S).group())
+        return data.get("tracks", [])
+    except Exception:
+        return _plan_heuristic(anchor, candidates, intent)
 
 
-def handle_callback(code: str) -> dict[str, Any]:
-    settings = get_settings()
-    if not settings.spotify_client_id or settings.mock_mode:
-        return {"access_token": "demo", "token_type": "Bearer"}
-    verifier = next(iter(_oauth_states.values()), "")
-    data = {
-        "grant_type": "authorization_code",
-        "code": code,
-        "redirect_uri": settings.spotify_redirect_uri,
-        "client_id": settings.spotify_client_id,
-        "code_verifier": verifier,
-    }
-    auth = (settings.spotify_client_id, settings.spotify_client_secret)
-    with httpx.Client(timeout=30) as client:
-        r = client.post("https://accounts.spotify.com/api/token", data=data, auth=auth)
-        r.raise_for_status()
-        return r.json()
+def _plan_heuristic(anchor: dict, candidates: list[dict], intent: str) -> list[dict]:
+    picks = candidates[:8]
+    out = []
+    for i, c in enumerate(picks):
+        out.append(
+            {
+                "id": c["id"],
+                "explanation": (
+                    f"Step {i + 1} from {anchor['name']}: bridges toward your goal — {intent[:60]}"
+                ),
+                "novelty_score": round(0.15 + i * 0.1, 2),
+            }
+        )
+    return out
 
 
-def _spotify_get(path: str, token: str, params: dict | None = None) -> dict:
-    headers = {"Authorization": f"Bearer {token}"}
-    with httpx.Client(timeout=30, headers=headers) as client:
-        r = client.get(f"https://api.spotify.com/v1{path}", params=params or {})
-        if r.status_code == 401:
-            return {}
-        r.raise_for_status()
-        return r.json()
+def _build_session(
+    anchor: dict,
+    plan: list[dict],
+    candidates: list[dict],
+    intent: str,
+    mode: str,
+) -> BridgeSession:
+    by_id = {c["id"]: c for c in candidates}
+    by_id[anchor["id"]] = anchor
+    tracks: list[BridgeTrack] = []
 
-
-def _demo_session(intent: str, anchor_track_id: str | None) -> BridgeSession:
-    anchor = anchor_track_id or DEMO_TRACKS[0][0]
-    anchor_name = next((t[2] for t in DEMO_TRACKS if t[0] == anchor), DEMO_TRACKS[0][2])
-    tracks = []
-    for i, (tid, artist, name) in enumerate(DEMO_TRACKS):
-        novelty = round(0.15 + i * 0.1, 2)
+    for i, step in enumerate(plan[:8]):
+        tid = step["id"]
+        meta = by_id.get(tid)
+        if not meta:
+            continue
         tracks.append(
             BridgeTrack(
-                position=i + 1,
+                position=len(tracks) + 1,
                 track_id=tid,
-                name=name,
-                artist=artist,
-                spotify_url=f"https://open.spotify.com/track/{tid}",
-                explanation=(
-                    f"Step {i + 1}: Gradual bridge from {anchor_name} — "
-                    f"{'shared groove, slightly higher energy' if i < 3 else 'introduces new texture while keeping BPM within 8%'} "
-                    f"for intent: {intent[:60]}"
-                ),
-                novelty_score=novelty,
+                name=meta["name"],
+                artist=meta["artist"],
+                spotify_url=meta.get("spotify_url") or track_url(tid),
+                explanation=step.get("explanation", ""),
+                novelty_score=float(step.get("novelty_score", 0.2 + i * 0.08)),
             )
         )
+
+    if len(tracks) < 8:
+        raise BridgeError("Could not build 8-track bridge — try a different anchor or intent.", "insufficient_tracks")
+
+    summary = (
+        f"Live bridge from {anchor['name']} — 8 tracks with AI-planned transitions."
+        if mode == "live"
+        else "Demo bridge using verified Spotify tracks. Connect Spotify for a personalized session."
+    )
     return BridgeSession(
-        anchor_track=anchor_name,
+        anchor_track=f"{anchor['name']} — {anchor['artist']}",
         intent=intent,
         tracks=tracks,
-        session_summary=(
-            "8-track bridge session moving from your comfort anchor toward novel artists "
-            "with explainable transitions. Demo mode — connect Spotify for live recommendations."
-        ),
+        session_summary=summary,
     )
+
+
+def resolve_anchor(
+    client: SpotifyClient | None,
+    anchor_track_id: str | None,
+) -> dict:
+    if anchor_track_id:
+        if client:
+            try:
+                return normalize_track(client.get_track(anchor_track_id))
+            except SpotifyAPIError as e:
+                raise BridgeError(str(e), e.code, e.status) from e
+        for d in DEMO_TRACKS:
+            if d["id"] == anchor_track_id:
+                return {**d, "spotify_url": track_url(d["id"]), "uri": f"spotify:track:{d['id']}"}
+        raise BridgeError(f"Track {anchor_track_id} not found.", "track_not_found", 404)
+
+    if client:
+        tops = client.top_tracks(limit=1)
+        if tops:
+            return normalize_track(tops[0])
+        raise BridgeError("No top tracks on your account — paste a Spotify track link.", "no_top_tracks")
+
+    anchor = DEMO_TRACKS[0]
+    return {**anchor, "spotify_url": track_url(anchor["id"]), "uri": f"spotify:track:{anchor['id']}"}
 
 
 def create_bridge_session(
     intent: str,
     anchor_track_id: str | None = None,
-    access_token: str = "demo",
+    client: SpotifyClient | None = None,
+    *,
+    force_demo: bool = False,
 ) -> BridgeSession:
+    if not intent.strip():
+        raise BridgeError("Describe your listening intent.", "missing_intent")
+
     settings = get_settings()
-    if access_token == "demo" or settings.mock_mode or not settings.spotify_client_id:
-        return _demo_session(intent, anchor_track_id)
-
-    top = _spotify_get("/me/top/tracks", access_token, {"limit": 5})
-    items = top.get("items", [])
-    anchor = anchor_track_id
-    anchor_name = "your top track"
-    if not anchor and items:
-        anchor = items[0]["id"]
-        anchor_name = items[0]["name"]
-    elif anchor:
-        meta = _spotify_get(f"/tracks/{anchor}", access_token)
-        anchor_name = meta.get("name", anchor_name)
-
-    seed = anchor or (items[0]["id"] if items else DEMO_TRACKS[0][0])
-    recs = _spotify_get(
-        "/recommendations",
-        access_token,
-        {
-            "seed_tracks": seed,
-            "limit": 8,
-            "min_energy": 0.3,
-            "max_energy": 0.85,
-        },
-    )
-    rec_items = recs.get("tracks", [])
-    if not rec_items:
-        return _demo_session(intent, seed)
-
-    tracks = []
-    for i, t in enumerate(rec_items):
-        tracks.append(
-            BridgeTrack(
-                position=i + 1,
-                track_id=t["id"],
-                name=t["name"],
-                artist=", ".join(a["name"] for a in t["artists"]),
-                spotify_url=t["external_urls"]["spotify"],
-                explanation=(
-                    f"Bridge step {i + 1} from {anchor_name}: selected for gradual novelty "
-                    f"matching your intent — {intent[:80]}"
-                ),
-                novelty_score=round(0.2 + i * 0.09, 2),
-            )
+    mode = "demo"
+    if client and not force_demo:
+        mode = "live"
+    elif not settings.allow_demo_mode and not client:
+        raise BridgeError(
+            "Connect Spotify to generate a bridge session.",
+            "auth_required",
+            401,
         )
-    return BridgeSession(
-        anchor_track=anchor_name,
-        intent=intent,
-        tracks=tracks,
-        session_summary=f"Live 8-track bridge from {anchor_name} toward novel artists for: {intent}",
-    )
+
+    anchor = resolve_anchor(client if mode == "live" else None, anchor_track_id)
+    candidates = _gather_candidates(client if mode == "live" else None, anchor, intent)
+    plan = _plan_with_llm(anchor, candidates, intent)
+    session = _build_session(anchor, plan, candidates, intent, mode)
+    return session
+
+
+def save_bridge_to_playlist(
+    client: SpotifyClient,
+    session: BridgeSession,
+) -> dict[str, Any]:
+    me = client.me()
+    user_id = me["id"]
+    name = f"Bridge Session — {session.anchor_track[:40]}"
+    desc = f"AI bridge session. Intent: {session.intent[:200]}"
+    playlist = client.create_playlist(user_id, name, desc)
+    uris = [f"spotify:track:{t.track_id}" for t in session.tracks]
+    client.add_tracks_to_playlist(playlist["id"], uris)
+    return {
+        "playlist_id": playlist["id"],
+        "playlist_url": playlist.get("external_urls", {}).get("spotify", ""),
+        "name": name,
+    }

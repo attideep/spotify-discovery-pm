@@ -72,13 +72,14 @@ Conversational 8-track bridge from comfort anchor → novel artists with explain
 - `POST /api/bridge` — generate session
 - Demo mode works without Spotify keys
 
-## Deploy
+## Production (P0 + P1)
 
-**Docker:** `docker compose up --build`
+See [`docs/PRODUCTION.md`](docs/PRODUCTION.md) for Vercel + Spotify Dashboard setup.
 
-**Vercel:** `vercel --prod` (see vercel.json)
+**Demo mode:** verified Spotify track IDs — links work without login.  
+**Live mode:** OAuth cookie session → Search API + Claude bridge planner → Save playlist.
 
-**Render/Railway:** Deploy Dockerfile, set env vars from `.env.example`
+Required Vercel env vars for live: `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SESSION_SECRET`, `ANTHROPIC_API_KEY`.
 
 ## Deck
 

@@ -7,6 +7,9 @@
     { "src": "/(.*)", "dest": "api/main.py" }
   ],
   "env": {
-    "MOCK_MODE": "true"
+    "MOCK_MODE": "false",
+    "ALLOW_DEMO_MODE": "true",
+    "SPOTIFY_REDIRECT_URI": "https://spotify-discovery-pm.vercel.app/mvp/callback",
+    "API_BASE_URL": "https://spotify-discovery-pm.vercel.app"
   }
 }

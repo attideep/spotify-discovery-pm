@@ -131,20 +131,30 @@
                   Connect Spotify
                 </a>
                 <button id="demoBtn" class="btn-spotify btn-spotify--ghost">Try demo</button>
+                <button id="logoutBtn" class="btn-spotify btn-spotify--ghost hidden">Log out</button>
               </div>
+              <p id="authStatus" class="hint" style="margin-top:12px"></p>
             </div>
           </div>
 
           <div class="bridge-form">
-            <label class="form-label">Anchor track (optional)</label>
-            <input class="form-input" id="anchorInput" type="text" placeholder="Paste Spotify track ID — or leave blank for your top track" />
+            <label class="form-label">Anchor track (paste Spotify link)</label>
+            <input class="form-input" id="anchorInput" type="text" placeholder="https://open.spotify.com/track/… or leave blank for your top track" />
+            <div id="anchorPreview" class="anchor-preview hidden"></div>
             <label class="form-label">Your intent</label>
             <textarea class="form-input" id="intentInput" rows="2" placeholder="Like Khruangbin but more energetic for a morning run"></textarea>
-            <button id="buildBtn" class="btn-spotify btn-spotify--green">Generate bridge session</button>
+            <div class="bridge-actions">
+              <button id="buildBtn" class="btn-spotify btn-spotify--green">Generate bridge session</button>
+              <button id="savePlaylistBtn" class="btn-spotify btn-spotify--ghost hidden">Save to Spotify</button>
+            </div>
+            <p id="bridgeError" class="bridge-error hidden"></p>
           </div>
 
           <div id="sessionBlock" class="hidden">
-            <div class="section-header"><h2 id="sessionTitle">Your bridge</h2></div>
+            <div class="section-header">
+              <h2 id="sessionTitle">Your bridge</h2>
+              <span id="sessionMode" class="sidebar__badge"></span>
+            </div>
             <p id="sessionSummary" style="color:var(--text-subdued);margin:-8px 0 16px;font-size:14px"></p>
             <div class="track-list-header">
               <span>#</span><span>Title</span><span>Novelty</span><span></span><span></span>

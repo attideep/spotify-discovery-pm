@@ -1,12 +1,23 @@
 const API = window.API_BASE || "";
-let accessToken = new URLSearchParams(location.search).get("token") || "demo";
+const FETCH_OPTS = { credentials: "include" };
+
+let isDemo = false;
+let isConnected = false;
+let lastSession = null;
 let currentTracks = [];
 let currentTrackIdx = 0;
 
-async function fetchJSON(path, opts) {
-  const r = await fetch(`${API}${path}`, opts);
-  if (!r.ok) throw new Error(await r.text());
-  return r.json();
+async function fetchJSON(path, opts = {}) {
+  const r = await fetch(`${API}${path}`, { ...FETCH_OPTS, ...opts });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) {
+    const msg = data.error || data.detail || r.statusText;
+    const err = new Error(msg);
+    err.code = data.code;
+    err.status = r.status;
+    throw err;
+  }
+  return data;
 }
 
 function toast(msg) {
@@ -14,6 +25,16 @@ function toast(msg) {
   el.textContent = msg;
   el.classList.add("visible");
   setTimeout(() => el.classList.remove("visible"), 2800);
+}
+
+function showBridgeError(msg) {
+  const el = document.getElementById("bridgeError");
+  el.textContent = msg;
+  el.classList.remove("hidden");
+}
+
+function clearBridgeError() {
+  document.getElementById("bridgeError").classList.add("hidden");
 }
 
 /* ── Tab navigation ── */
@@ -40,8 +61,75 @@ document.querySelectorAll(".nav-item, .sidebar__list-item, .media-card, [data-ta
   });
 });
 
-const hash = location.hash.replace("#", "") || (location.pathname.includes("bridge") ? "bridge" : "home");
+const hash = location.hash.replace("#", "").split("?")[0] || (location.pathname.includes("bridge") ? "bridge" : "home");
 if (["home", "bridge", "insights", "ask"].includes(hash)) switchTab(hash);
+
+const urlError = new URLSearchParams(location.hash.split("?")[1] || "").get("error");
+if (urlError) {
+  switchTab("bridge");
+  showBridgeError(`Spotify connection failed (${urlError}). Try again.`);
+}
+
+/* ── Auth ── */
+async function refreshAuthUI() {
+  const status = await fetchJSON("/api/auth/status");
+  isConnected = status.connected;
+  const login = document.getElementById("spotifyLogin");
+  const logout = document.getElementById("logoutBtn");
+  const authStatus = document.getElementById("authStatus");
+
+  if (isConnected) {
+    login.textContent = `Connected · ${status.display_name}`;
+    login.classList.remove("btn-spotify--green");
+    login.classList.add("btn-spotify--ghost");
+    login.removeAttribute("href");
+    logout.classList.remove("hidden");
+    authStatus.textContent = "Live mode — bridges use your taste + Spotify Search.";
+    isDemo = false;
+  } else {
+    login.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg> Connect Spotify`;
+    login.classList.add("btn-spotify--green");
+    login.href = "/mvp/login";
+    logout.classList.add("hidden");
+    authStatus.textContent = status.spotify_configured
+      ? "Connect Spotify for personalized bridges, or use demo mode."
+      : "Demo mode — server Spotify keys not set yet.";
+  }
+}
+
+document.getElementById("logoutBtn")?.addEventListener("click", async () => {
+  await fetchJSON("/mvp/logout", { method: "POST" });
+  isConnected = false;
+  isDemo = false;
+  await refreshAuthUI();
+  toast("Logged out");
+});
+
+/* ── Anchor preview ── */
+async function previewAnchor() {
+  const raw = document.getElementById("anchorInput").value.trim();
+  const preview = document.getElementById("anchorPreview");
+  if (!raw) {
+    preview.classList.add("hidden");
+    return;
+  }
+  try {
+    const track = await fetchJSON("/api/track/lookup", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ anchor: raw }),
+    });
+    preview.classList.remove("hidden");
+    preview.innerHTML = `
+      ${track.album_art ? `<img src="${track.album_art}" alt="" />` : ""}
+      <div><strong>${track.name}</strong><br/><span style="color:var(--text-subdued)">${track.artist}</span></div>`;
+  } catch (e) {
+    preview.classList.add("hidden");
+  }
+}
+
+document.getElementById("anchorInput")?.addEventListener("change", previewAnchor);
+document.getElementById("anchorInput")?.addEventListener("blur", previewAnchor);
 
 /* ── Insights ── */
 function renderThemes(themes, targetId = "themes") {
@@ -109,7 +197,6 @@ function renderAnswer(data) {
 }
 
 async function loadInsights() {
-  toast("Loading insights…");
   const data = await fetchJSON("/api/insights");
   renderThemes(data.themes);
   renderHomeThemes(data.themes);
@@ -128,7 +215,6 @@ async function loadInsights() {
       switchTab("ask");
     });
   });
-  toast(`${data.total_reviews} reviews indexed`);
 }
 
 document.getElementById("runIngest")?.addEventListener("click", async () => {
@@ -138,7 +224,7 @@ document.getElementById("runIngest")?.addEventListener("click", async () => {
   await loadInsights();
 });
 
-document.getElementById("loadInsights")?.addEventListener("click", loadInsights);
+document.getElementById("loadInsights")?.addEventListener("click", () => loadInsights().then(() => toast("Refreshed")));
 
 document.getElementById("askBtn")?.addEventListener("click", async () => {
   const q = document.getElementById("questionInput").value.trim();
@@ -171,10 +257,6 @@ const GRADIENTS = [
   "linear-gradient(135deg,#509bf5,#1ed760)",
   "linear-gradient(135deg,#8c67ab,#509bf5)",
   "linear-gradient(135deg,#f59b23,#e91429)",
-  "linear-gradient(135deg,#450af5,#c4efd9)",
-  "linear-gradient(135deg,#1ed760,#509bf5)",
-  "linear-gradient(135deg,#e91429,#f59b23)",
-  "linear-gradient(135deg,#169c46,#121212)",
 ];
 
 function updatePlayer(track, idx) {
@@ -202,7 +284,7 @@ function renderTracks(tracks) {
       </div>
       <span class="track-row__novelty">${Math.round(t.novelty_score * 100)}% new</span>
       <span></span>
-      <a class="track-row__link" href="${t.spotify_url}" target="_blank" aria-label="Open in Spotify">
+      <a class="track-row__link" href="${t.spotify_url}" target="_blank" rel="noopener" aria-label="Open in Spotify">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg>
       </a>
     </div>
@@ -221,29 +303,64 @@ function renderTracks(tracks) {
   if (tracks.length) updatePlayer(tracks[0], 0);
 }
 
-document.getElementById("demoBtn")?.addEventListener("click", async () => {
-  const data = await fetchJSON("/mvp/demo-token");
-  accessToken = data.access_token;
-  toast("Demo mode — generate a bridge below");
+document.getElementById("demoBtn")?.addEventListener("click", () => {
+  isDemo = true;
+  toast("Demo mode — verified Spotify tracks, generic bridge");
 });
 
 document.getElementById("buildBtn")?.addEventListener("click", async () => {
+  clearBridgeError();
   const intent = document.getElementById("intentInput").value.trim();
   if (!intent) return toast("Enter your intent first");
   const anchor = document.getElementById("anchorInput").value.trim() || null;
   toast("Building your bridge…");
 
-  const session = await fetchJSON("/api/bridge", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ intent, anchor_track_id: anchor, access_token: accessToken }),
-  });
+  try {
+    const session = await fetchJSON("/api/bridge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ intent, anchor, demo: isDemo && !isConnected }),
+    });
 
-  document.getElementById("sessionBlock").classList.remove("hidden");
-  document.getElementById("sessionTitle").textContent = `Bridge from ${session.anchor_track}`;
-  document.getElementById("sessionSummary").textContent = session.session_summary;
-  renderTracks(session.tracks);
-  toast("Bridge session ready — 8 tracks");
+    lastSession = session;
+    document.getElementById("sessionBlock").classList.remove("hidden");
+    document.getElementById("sessionTitle").textContent = `Bridge from ${session.anchor_track}`;
+    document.getElementById("sessionSummary").textContent = session.session_summary;
+    document.getElementById("sessionMode").textContent = session.mode === "live" ? "Live" : "Demo";
+    renderTracks(session.tracks);
+
+    const saveBtn = document.getElementById("savePlaylistBtn");
+    if (isConnected && session.mode === "live") {
+      saveBtn.classList.remove("hidden");
+    } else {
+      saveBtn.classList.add("hidden");
+    }
+    toast(`Bridge ready — ${session.tracks.length} tracks (${session.mode})`);
+  } catch (e) {
+    showBridgeError(e.message);
+    if (e.code === "auth_required") switchTab("bridge");
+  }
+});
+
+document.getElementById("savePlaylistBtn")?.addEventListener("click", async () => {
+  if (!lastSession) return;
+  clearBridgeError();
+  toast("Saving playlist to Spotify…");
+  try {
+    const result = await fetchJSON("/api/bridge/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        track_ids: lastSession.tracks.map(t => t.track_id),
+        anchor_track: lastSession.anchor_track,
+        intent: lastSession.intent,
+      }),
+    });
+    toast("Playlist saved!");
+    if (result.playlist_url) window.open(result.playlist_url, "_blank");
+  } catch (e) {
+    showBridgeError(e.message);
+  }
 });
 
 document.getElementById("playerPlay")?.addEventListener("click", () => {
@@ -251,15 +368,8 @@ document.getElementById("playerPlay")?.addEventListener("click", () => {
     window.open(currentTracks[currentTrackIdx].spotify_url, "_blank");
   } else {
     switchTab("bridge");
-    toast("Generate a bridge session to play");
+    toast("Generate a bridge session first");
   }
 });
 
-if (accessToken && accessToken !== "demo") {
-  const login = document.getElementById("spotifyLogin");
-  login.textContent = "Connected";
-  login.classList.add("btn-spotify--ghost");
-  login.removeAttribute("href");
-}
-
-loadInsights().catch(e => toast("Error: " + e.message));
+Promise.all([refreshAuthUI(), loadInsights()]).catch(e => toast("Error: " + e.message));

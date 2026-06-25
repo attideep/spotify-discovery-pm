@@ -6,17 +6,23 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
-    mock_mode: bool = True
+    mock_mode: bool = False
     anthropic_api_key: str = ""
     gemini_api_key: str = ""
     database_url: str = ""
     spotify_client_id: str = ""
     spotify_client_secret: str = ""
-    spotify_redirect_uri: str = "http://localhost:8000/mvp/callback"
-    api_base_url: str = "http://localhost:8000"
-    web_base_url: str = "http://localhost:4321"
+    spotify_redirect_uri: str = "https://spotify-discovery-pm.vercel.app/mvp/callback"
+    session_secret: str = "change-me-in-production"
+    api_base_url: str = "https://spotify-discovery-pm.vercel.app"
+    web_base_url: str = "https://spotify-discovery-pm.vercel.app"
     data_dir: str = "data"
     corpus_path: str = "data/corpus.json"
+    allow_demo_mode: bool = True
+
+    @property
+    def spotify_configured(self) -> bool:
+        return bool(self.spotify_client_id and self.spotify_client_secret)
 
 
 @lru_cache
