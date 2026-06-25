@@ -23,6 +23,7 @@ from mvp.auth import (
 )
 from mvp.bridge import BridgeError, create_bridge_session, save_bridge_to_playlist
 from mvp.parse import parse_track_id
+from mvp.track_lookup import lookup_track
 from mvp.session import (
     COOKIE_OAUTH,
     COOKIE_SESSION,
@@ -30,7 +31,7 @@ from mvp.session import (
     oauth_cookie_kwargs,
     session_cookie_kwargs,
 )
-from mvp.spotify_client import SpotifyAPIError, normalize_track
+from mvp.spotify_client import SpotifyAPIError
 
 app = FastAPI(
     title="Spotify Discovery Engine",
@@ -232,24 +233,10 @@ def api_track_lookup(track_ref: str) -> dict:
     tid = parse_track_id(track_ref)
     if not tid:
         raise HTTPException(400, "Invalid Spotify track URL or ID")
-    settings = get_settings()
-    if settings.spotify_configured:
-        try:
-            from mvp.demo_tracks import DEMO_TRACKS
-
-            # Use client credentials-less public track lookup requires user token;
-            # for lookup without auth, validate against demo list or require session
-            for d in DEMO_TRACKS:
-                if d["id"] == tid:
-                    return {**d, "spotify_url": f"https://open.spotify.com/track/{tid}"}
-        except Exception:
-            pass
-    from mvp.demo_tracks import DEMO_TRACKS
-
-    for d in DEMO_TRACKS:
-        if d["id"] == tid:
-            return {**d, "spotify_url": f"https://open.spotify.com/track/{tid}"}
-    raise HTTPException(404, "Track not found — connect Spotify for full catalog lookup")
+    track = lookup_track(tid)
+    if not track:
+        raise HTTPException(404, "Track not found on Spotify")
+    return track
 
 
 @app.post("/api/track/lookup")
@@ -263,18 +250,10 @@ def api_track_lookup_post(
         raise HTTPException(400, "Paste a valid Spotify track link or ID")
 
     client = client_from_session(bridge_session)
-    if client:
-        try:
-            return normalize_track(client.get_track(tid))
-        except SpotifyAPIError as e:
-            raise HTTPException(e.status or 502, str(e)) from e
-
-    from mvp.demo_tracks import DEMO_TRACKS
-
-    for d in DEMO_TRACKS:
-        if d["id"] == tid:
-            return {**d, "spotify_url": f"https://open.spotify.com/track/{tid}"}
-    raise HTTPException(404, "Track not found. Connect Spotify to look up any track.")
+    track = lookup_track(tid, client)
+    if not track:
+        raise HTTPException(404, "Track not found on Spotify — check the link")
+    return track
 
 
 @app.post("/api/bridge")

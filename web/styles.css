@@ -506,6 +506,125 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 
 .bridge-actions { display: flex; gap: 24px; align-items: center; flex-wrap: wrap; }
 
+.bridge-actions--primary { margin-bottom: 8px; }
+
+.btn-spotify--sm {
+  padding: 10px 20px;
+  font-size: 13px;
+}
+
+.btn-spotify--disabled {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+.public-banner {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  flex-wrap: wrap;
+  padding: 28px 32px;
+  margin-bottom: 32px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(30,215,96,0.18), rgba(80,155,245,0.12));
+  border: 1px solid rgba(255,255,255,0.08);
+}
+
+.public-banner__eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--green);
+  margin: 0 0 8px;
+}
+
+.public-banner__title {
+  font-size: clamp(22px, 3vw, 32px);
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  margin: 0 0 8px;
+  max-width: 640px;
+}
+
+.public-banner__desc {
+  color: var(--text-subdued);
+  font-size: 14px;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 620px;
+}
+
+.public-banner__cta { flex-shrink: 0; }
+
+.connect-beta {
+  margin-top: 24px;
+  padding: 16px 20px;
+  border-radius: var(--radius-md);
+  background: rgba(255,255,255,0.03);
+  border: 1px dashed rgba(255,255,255,0.12);
+  max-width: 520px;
+}
+
+.connect-beta--connected {
+  border-style: solid;
+  border-color: rgba(30,215,96,0.25);
+  background: rgba(30,215,96,0.06);
+}
+
+.connect-beta__head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.connect-beta__title {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.connect-beta__desc {
+  font-size: 13px;
+  color: var(--text-subdued);
+  line-height: 1.55;
+  margin: 0 0 12px;
+}
+
+.badge-beta {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  padding: 3px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(255,255,255,0.1);
+  color: var(--text-subdued);
+}
+
+.hint--prominent {
+  margin-top: 12px;
+  font-size: 13px;
+  color: var(--green);
+  font-weight: 600;
+}
+
+.chip-row--compact {
+  margin: -4px 0 16px;
+}
+
+.chip-row--compact .chip {
+  font-size: 12px;
+  padding: 6px 12px;
+}
+
+.session-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 .btn-spotify {
   display: inline-flex;
   align-items: center;

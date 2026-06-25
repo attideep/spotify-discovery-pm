@@ -52,17 +52,29 @@
 
 Check `/health` → `spotify_configured: true` when Spotify keys are set.
 
+## Product positioning (2026-06-25)
+
+**Public launch model:** Unlimited free use via demo bridges — no login. Connect
+Spotify is **private beta** (Spotify Dev Mode caps OAuth at 5 users until
+Extended Quota is approved).
+
+Features for unlimited public use:
+- Bridge Sessions (8-track journeys, verified Spotify links)
+- Paste **any** public Spotify track URL as anchor (oEmbed lookup)
+- **Share bridge** via copy-link (`/#bridge?share=…`)
+- Discovery Lab + Ask Corpus
+
 ## Verification walkthrough (user progress)
 
 | Step | What | Status |
 |---|---|---|
 | 1 | UI loads styled | ✅ Passed |
 | 2 | `/health` returns OK | ✅ Passed |
-| 3 | Demo bridge → Spotify links open real tracks | 🔄 **Fixed 2026-06-25** — redeploy needed |
-| 4 | Anchor URL paste resolves | Pending |
-| 5 | Vercel env vars set | Pending (user) |
-| 6 | Spotify Developer redirect URI | Pending (user) |
-| 7–12 | OAuth, live bridge, save playlist | Pending |
+| 3 | Demo bridge → Spotify links open real tracks | ✅ Passed |
+| 4 | Anchor URL paste resolves | ✅ Passed |
+| 5 | Vercel env vars set | Partial (no Spotify keys — Premium gate) |
+| 6 | Spotify Developer | Skipped — public demo-first launch |
+| 7+ | Share links, oEmbed anchors, public UX | ✅ Shipped 2026-06-25 |
 
 ### Step 3 — root cause (2026-06-25)
 Nine of eleven demo track IDs were **invalid on Spotify** (404 / wrong song).
@@ -79,11 +91,30 @@ Know The Better* is `6K4t31amVTZDgR3sKmwUJJ`. `Maria También` ID pointed at
 3. Click **Generate bridge session**
 4. Click any track row link → should open Spotify track page (not “Page not found”)
 
+## Spotify Developer — Premium requirement (2026)
+
+As of **Feb–Mar 2026**, Spotify requires an active **Premium subscription** on
+the developer account to create/use Development Mode apps. See
+[Spotify's Feb 2026 update](https://developer.spotify.com/blog/2026-02-06-update-on-developer-access-and-platform-security).
+
+Implications for this project:
+- **Demo mode** (Steps 1–4) works without any Spotify dev account ✅
+- **Live OAuth, save playlist, arbitrary track lookup** need Client ID/Secret
+- Dev Mode also caps **5 test users** per app and **1 Client ID** per developer
+
+**Workaround for assignment review:** Demo mode is production-ready for the
+MVP story; live path is documented in `docs/PRODUCTION.md` for when Premium
+is available.
+
 ## Open items (post-P1)
 - P2: Supabase persistence, rate limiting, monitoring, custom domain
 - User: add Vercel env vars for live OAuth + save playlist
 - Do **not** edit `.cursor/plans/spotify_discovery_pm_5640145e.plan.md`
 
 ## Session log (recent)
+- **2026-06-25:** Public demo-first UX — share links, oEmbed anchors, Connect
+  Spotify moved to private beta messaging.
+- **2026-06-25:** Steps 5–6 blocked — Spotify Developer requires Premium;
+  user chose unlimited public demo path instead.
 - **2026-06-25:** Fixed invalid demo track IDs; added `CONTEXT.md` and oEmbed
   verification script; user reported Spotify “Page not found” on Step 3.

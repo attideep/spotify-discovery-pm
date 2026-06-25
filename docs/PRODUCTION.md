@@ -24,12 +24,13 @@ Set in Vercel → Project → Settings → Environment Variables:
 
 ## User flows
 
-### Demo (no login)
-1. Click **Try demo**
-2. Enter intent → Generate bridge
-3. Tracks use **verified Spotify IDs** — links work on open.spotify.com
+### Demo (no login — unlimited public use)
+1. Open **Bridge Sessions** → enter intent → **Generate bridge session**
+2. Optional: paste **any** public Spotify track URL as anchor
+3. Tracks use verified IDs — links open on open.spotify.com
+4. **Copy share link** to send the session to friends
 
-### Live (Spotify connected)
+### Live (Spotify connected — private beta, max 5 users)
 1. **Connect Spotify** → OAuth → HttpOnly cookie session
 2. Optional: paste track URL as anchor
 3. Generate bridge → Search API gathers candidates → Claude plans 8 tracks

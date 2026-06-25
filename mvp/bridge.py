@@ -7,6 +7,7 @@ from typing import Any
 from discovery.config import get_settings
 from discovery.models import BridgeSession, BridgeTrack
 from mvp.demo_tracks import DEMO_TRACKS
+from mvp.oembed import lookup_track_oembed
 from mvp.parse import track_url
 from mvp.spotify_client import SpotifyAPIError, SpotifyClient, normalize_track
 
@@ -163,10 +164,15 @@ def _build_session(
     summary = (
         f"Live bridge from {anchor['name']} — 8 tracks with AI-planned transitions."
         if mode == "live"
-        else "Demo bridge using verified Spotify tracks. Connect Spotify for a personalized session."
+        else "Free bridge using verified Spotify tracks — paste any public track link as your anchor."
+    )
+    anchor_label = (
+        f"{anchor['name']} — {anchor['artist']}"
+        if anchor.get("artist")
+        else anchor["name"]
     )
     return BridgeSession(
-        anchor_track=f"{anchor['name']} — {anchor['artist']}",
+        anchor_track=anchor_label,
         intent=intent,
         tracks=tracks,
         session_summary=summary,
@@ -186,7 +192,14 @@ def resolve_anchor(
         for d in DEMO_TRACKS:
             if d["id"] == anchor_track_id:
                 return {**d, "spotify_url": track_url(d["id"]), "uri": f"spotify:track:{d['id']}"}
-        raise BridgeError(f"Track {anchor_track_id} not found.", "track_not_found", 404)
+        oembed = lookup_track_oembed(anchor_track_id)
+        if oembed:
+            return oembed
+        raise BridgeError(
+            f"Track not found — check the Spotify link and try again.",
+            "track_not_found",
+            404,
+        )
 
     if client:
         tops = client.top_tracks(limit=1)

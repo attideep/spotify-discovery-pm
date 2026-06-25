@@ -1,11 +1,86 @@
 const API = window.API_BASE || "";
 const FETCH_OPTS = { credentials: "include" };
 
-let isDemo = false;
+const EXAMPLE_ANCHORS = [
+  { label: "Holocene · Bon Iver", url: "https://open.spotify.com/track/35KiiILklye1JRRctaLUb4" },
+  { label: "Tame Impala", url: "https://open.spotify.com/track/6K4t31amVTZDgR3sKmwUJJ" },
+  { label: "Khruangbin", url: "https://open.spotify.com/track/0bOqusuuIBSYnIyVswZJPV" },
+];
+
+const EXAMPLE_INTENTS = [
+  "Like Khruangbin but more energetic for a morning run",
+  "Warm indie folk, slow build",
+  "Psychedelic groove — safe steps toward something new",
+];
+
 let isConnected = false;
 let lastSession = null;
 let currentTracks = [];
 let currentTrackIdx = 0;
+
+function parseHashState() {
+  const raw = location.hash.replace("#", "");
+  const [tabPart, queryPart] = raw.split("?");
+  const tab = tabPart || (location.pathname.includes("bridge") ? "bridge" : "home");
+  const params = new URLSearchParams(queryPart || "");
+  return { tab, params };
+}
+
+function encodeShare(session) {
+  const slim = {
+    a: session.anchor_track,
+    i: session.intent,
+    s: session.session_summary,
+    m: session.mode,
+    t: session.tracks.map(t => ({
+      p: t.position,
+      id: t.track_id,
+      n: t.name,
+      ar: t.artist,
+      u: t.spotify_url,
+      e: t.explanation,
+      nv: t.novelty_score,
+    })),
+  };
+  return btoa(unescape(encodeURIComponent(JSON.stringify(slim))));
+}
+
+function decodeShare(encoded) {
+  const slim = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+  return {
+    anchor_track: slim.a,
+    intent: slim.i,
+    session_summary: slim.s,
+    mode: slim.m || "demo",
+    tracks: (slim.t || []).map(t => ({
+      position: t.p,
+      track_id: t.id,
+      name: t.n,
+      artist: t.ar,
+      spotify_url: t.u,
+      explanation: t.e,
+      novelty_score: t.nv,
+    })),
+  };
+}
+
+function displaySession(session) {
+  lastSession = session;
+  document.getElementById("sessionBlock").classList.remove("hidden");
+  document.getElementById("sessionTitle").textContent = `Bridge from ${session.anchor_track}`;
+  document.getElementById("sessionSummary").textContent = session.session_summary;
+  document.getElementById("sessionMode").textContent = session.mode === "live" ? "Live beta" : "Free";
+  renderTracks(session.tracks);
+
+  const saveBtn = document.getElementById("savePlaylistBtn");
+  const shareBtn = document.getElementById("shareBridgeBtn");
+  if (isConnected && session.mode === "live") {
+    saveBtn.classList.remove("hidden");
+  } else {
+    saveBtn.classList.add("hidden");
+  }
+  shareBtn.classList.remove("hidden");
+}
 
 async function fetchJSON(path, opts = {}) {
   const r = await fetch(`${API}${path}`, { ...FETCH_OPTS, ...opts });
@@ -51,6 +126,29 @@ function switchTab(tab) {
   history.replaceState(null, "", tab === "home" ? "/" : `/#${tab}`);
 }
 
+function initExampleChips() {
+  const anchorEl = document.getElementById("anchorChips");
+  anchorEl.innerHTML = EXAMPLE_ANCHORS.map(a =>
+    `<button type="button" class="chip" data-anchor="${a.url}">${a.label}</button>`
+  ).join("");
+  anchorEl.querySelectorAll(".chip").forEach(btn => {
+    btn.addEventListener("click", () => {
+      document.getElementById("anchorInput").value = btn.dataset.anchor;
+      previewAnchor();
+    });
+  });
+
+  const intentEl = document.getElementById("intentChips");
+  intentEl.innerHTML = EXAMPLE_INTENTS.map(() => `<button type="button" class="chip"></button>`).join("");
+  intentEl.querySelectorAll(".chip").forEach((btn, i) => {
+    const text = EXAMPLE_INTENTS[i];
+    btn.textContent = text.length > 36 ? text.slice(0, 36) + "…" : text;
+    btn.addEventListener("click", () => {
+      document.getElementById("intentInput").value = text;
+    });
+  });
+}
+
 document.querySelectorAll(".nav-item, .sidebar__list-item, .media-card, [data-tab]").forEach(el => {
   el.addEventListener("click", e => {
     const tab = el.dataset.tab;
@@ -61,10 +159,21 @@ document.querySelectorAll(".nav-item, .sidebar__list-item, .media-card, [data-ta
   });
 });
 
-const hash = location.hash.replace("#", "").split("?")[0] || (location.pathname.includes("bridge") ? "bridge" : "home");
-if (["home", "bridge", "insights", "ask"].includes(hash)) switchTab(hash);
+const { tab: initialTab, params: hashParams } = parseHashState();
+if (["home", "bridge", "insights", "ask"].includes(initialTab)) switchTab(initialTab);
 
-const urlError = new URLSearchParams(location.hash.split("?")[1] || "").get("error");
+if (hashParams.get("share")) {
+  try {
+    displaySession(decodeShare(hashParams.get("share")));
+    switchTab("bridge");
+    toast("Shared bridge session loaded");
+  } catch {
+    switchTab("bridge");
+    showBridgeError("Could not load shared bridge — link may be invalid.");
+  }
+}
+
+const urlError = hashParams.get("error");
 if (urlError) {
   switchTab("bridge");
   showBridgeError(`Spotify connection failed (${urlError}). Try again.`);
@@ -77,30 +186,39 @@ async function refreshAuthUI() {
   const login = document.getElementById("spotifyLogin");
   const logout = document.getElementById("logoutBtn");
   const authStatus = document.getElementById("authStatus");
+  const connectBeta = document.getElementById("connectBeta");
 
   if (isConnected) {
     login.textContent = `Connected · ${status.display_name}`;
-    login.classList.remove("btn-spotify--green");
-    login.classList.add("btn-spotify--ghost");
+    login.classList.add("btn-spotify--disabled");
     login.removeAttribute("href");
     logout.classList.remove("hidden");
-    authStatus.textContent = "Live mode — bridges use your taste + Spotify Search.";
-    isDemo = false;
+    authStatus.textContent = "Beta connected — personalized bridges and save playlist enabled.";
+    connectBeta?.classList.add("connect-beta--connected");
   } else {
-    login.innerHTML = `<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg> Connect Spotify`;
-    login.classList.add("btn-spotify--green");
-    login.href = "/mvp/login";
+    login.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg> Request beta access`;
     logout.classList.add("hidden");
-    authStatus.textContent = status.spotify_configured
-      ? "Connect Spotify for personalized bridges, or use demo mode."
-      : "Demo mode — server Spotify keys not set yet.";
+    connectBeta?.classList.remove("connect-beta--connected");
+    authStatus.textContent = "Free mode — unlimited bridges for everyone. No Spotify login needed.";
+
+    if (status.spotify_configured) {
+      login.classList.remove("btn-spotify--disabled");
+      login.href = "/mvp/login";
+      login.onclick = null;
+    } else {
+      login.classList.add("btn-spotify--disabled");
+      login.removeAttribute("href");
+      login.onclick = (e) => {
+        e.preventDefault();
+        toast("Private beta invites opening soon — free bridges work without login.");
+      };
+    }
   }
 }
 
 document.getElementById("logoutBtn")?.addEventListener("click", async () => {
   await fetchJSON("/mvp/logout", { method: "POST" });
   isConnected = false;
-  isDemo = false;
   await refreshAuthUI();
   toast("Logged out");
 });
@@ -122,7 +240,7 @@ async function previewAnchor() {
     preview.classList.remove("hidden");
     preview.innerHTML = `
       ${track.album_art ? `<img src="${track.album_art}" alt="" />` : ""}
-      <div><strong>${track.name}</strong><br/><span style="color:var(--text-subdued)">${track.artist}</span></div>`;
+      <div><strong>${track.name}</strong><br/><span style="color:var(--text-subdued)">${track.artist || "Spotify track"}</span></div>`;
   } catch (e) {
     preview.classList.add("hidden");
   }
@@ -303,9 +421,9 @@ function renderTracks(tracks) {
   if (tracks.length) updatePlayer(tracks[0], 0);
 }
 
-document.getElementById("demoBtn")?.addEventListener("click", () => {
-  isDemo = true;
-  toast("Demo mode — verified Spotify tracks, generic bridge");
+document.getElementById("startBridgeBtn")?.addEventListener("click", () => {
+  switchTab("bridge");
+  document.getElementById("intentInput")?.focus();
 });
 
 document.getElementById("buildBtn")?.addEventListener("click", async () => {
@@ -319,26 +437,26 @@ document.getElementById("buildBtn")?.addEventListener("click", async () => {
     const session = await fetchJSON("/api/bridge", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ intent, anchor, demo: isDemo && !isConnected }),
+      body: JSON.stringify({ intent, anchor, demo: !isConnected }),
     });
 
-    lastSession = session;
-    document.getElementById("sessionBlock").classList.remove("hidden");
-    document.getElementById("sessionTitle").textContent = `Bridge from ${session.anchor_track}`;
-    document.getElementById("sessionSummary").textContent = session.session_summary;
-    document.getElementById("sessionMode").textContent = session.mode === "live" ? "Live" : "Demo";
-    renderTracks(session.tracks);
-
-    const saveBtn = document.getElementById("savePlaylistBtn");
-    if (isConnected && session.mode === "live") {
-      saveBtn.classList.remove("hidden");
-    } else {
-      saveBtn.classList.add("hidden");
-    }
-    toast(`Bridge ready — ${session.tracks.length} tracks (${session.mode})`);
+    displaySession(session);
+    toast(`Bridge ready — ${session.tracks.length} tracks`);
   } catch (e) {
     showBridgeError(e.message);
     if (e.code === "auth_required") switchTab("bridge");
+  }
+});
+
+document.getElementById("shareBridgeBtn")?.addEventListener("click", async () => {
+  if (!lastSession) return;
+  const encoded = encodeShare(lastSession);
+  const url = `${location.origin}/#bridge?share=${encodeURIComponent(encoded)}`;
+  try {
+    await navigator.clipboard.writeText(url);
+    toast("Share link copied!");
+  } catch {
+    prompt("Copy this link:", url);
   }
 });
 
@@ -372,4 +490,4 @@ document.getElementById("playerPlay")?.addEventListener("click", () => {
   }
 });
 
-Promise.all([refreshAuthUI(), loadInsights()]).catch(e => toast("Error: " + e.message));
+Promise.all([refreshAuthUI(), loadInsights(), Promise.resolve(initExampleChips())]).catch(e => toast("Error: " + e.message));
