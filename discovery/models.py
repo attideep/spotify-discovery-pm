@@ -61,6 +61,7 @@ class BridgeTrack(BaseModel):
     name: str
     artist: str
     spotify_url: str
+    album_art: str = ""
     explanation: str
     novelty_score: float
 

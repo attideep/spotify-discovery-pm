@@ -59,9 +59,10 @@ Spotify is **private beta** (Spotify Dev Mode caps OAuth at 5 users until
 Extended Quota is approved).
 
 Features for unlimited public use:
-- Bridge Sessions (8-track journeys, verified Spotify links)
+- Bridge Sessions (8-track journeys, verified Spotify links, **album art**)
 - Paste **any** public Spotify track URL as anchor (oEmbed lookup)
-- **Share bridge** via copy-link (`/#bridge?share=…`)
+- **Search bar** — full Spotify catalog when API keys set; demo catalog otherwise
+- **Share bridge** via copy-link (`/#bridge?intent=…&anchor=…`)
 - Discovery Lab + Ask Corpus
 
 ## Verification walkthrough (user progress)

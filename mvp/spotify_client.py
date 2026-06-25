@@ -15,6 +15,9 @@ class SpotifyAPIError(Exception):
         self.code = code
 
 
+_catalog_token: dict[str, Any] = {"access_token": "", "expires_at": 0.0}
+
+
 class SpotifyClient:
     BASE = "https://api.spotify.com/v1"
     ACCOUNTS = "https://accounts.spotify.com/api/token"
@@ -58,6 +61,36 @@ class SpotifyClient:
         if not r.content:
             return {}
         return r.json()
+
+    @classmethod
+    def from_client_credentials(cls) -> SpotifyClient:
+        """App-only token for public catalog search (no user login)."""
+        settings = get_settings()
+        if not settings.spotify_configured:
+            raise SpotifyAPIError("Spotify not configured on server.", 503, "not_configured")
+
+        global _catalog_token
+        if _catalog_token["access_token"] and _catalog_token["expires_at"] > time.time() + 60:
+            return cls(_catalog_token["access_token"])
+
+        with httpx.Client(timeout=30) as client:
+            r = client.post(
+                cls.ACCOUNTS,
+                data={"grant_type": "client_credentials"},
+                auth=(settings.spotify_client_id, settings.spotify_client_secret),
+            )
+        if r.status_code >= 400:
+            raise SpotifyAPIError(
+                f"Spotify catalog auth failed: {r.text[:200]}",
+                r.status_code,
+                "catalog_auth_failed",
+            )
+        payload = r.json()
+        _catalog_token = {
+            "access_token": payload["access_token"],
+            "expires_at": time.time() + payload.get("expires_in", 3600),
+        }
+        return cls(payload["access_token"])
 
     @classmethod
     def exchange_code(cls, code: str, verifier: str) -> dict[str, Any]:

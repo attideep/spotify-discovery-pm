@@ -417,18 +417,75 @@ document.getElementById("askBtn")?.addEventListener("click", async () => {
   renderAnswer(resp);
 });
 
+function hideSearchResults() {
+  document.getElementById("searchResults")?.classList.add("hidden");
+}
+
+function renderSearchResults(data) {
+  const el = document.getElementById("searchResults");
+  if (!el) return;
+  const tracks = data.tracks || [];
+  if (!tracks.length) {
+    el.innerHTML = `<div class="search-results__hint">No tracks found.</div>`;
+    el.classList.remove("hidden");
+    return;
+  }
+  el.innerHTML = tracks.map(t => `
+    <button type="button" class="search-result" data-url="${t.spotify_url}">
+      ${t.album_art ? `<img class="search-result__art" src="${t.album_art}" alt="" loading="lazy" />` : `<div class="search-result__art"></div>`}
+      <div class="search-result__meta">
+        <div class="search-result__title">${t.name}</div>
+        <div class="search-result__artist">${t.artist || "Spotify"}</div>
+      </div>
+    </button>
+  `).join("") + (data.hint ? `<div class="search-results__hint">${data.hint}</div>` : "");
+  el.classList.remove("hidden");
+  el.querySelectorAll(".search-result").forEach(btn => {
+    btn.addEventListener("click", () => {
+      switchTab("bridge");
+      document.getElementById("anchorInput").value = btn.dataset.url;
+      previewAnchor();
+      hideSearchResults();
+      document.getElementById("globalSearch").value = "";
+      toast("Anchor track set — add intent and generate bridge");
+    });
+  });
+}
+
+async function searchTracks(q) {
+  const data = await fetchJSON(`/api/search/tracks?q=${encodeURIComponent(q)}`);
+  renderSearchResults(data);
+}
+
 document.getElementById("globalSearch")?.addEventListener("keydown", async e => {
   if (e.key !== "Enter") return;
   const q = e.target.value.trim();
   if (!q) return;
-  switchTab("ask");
-  document.getElementById("questionInput").value = q;
-  const resp = await fetchJSON("/api/ask", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ question: q }),
-  });
-  renderAnswer(resp);
+  if (q.startsWith("?")) {
+    switchTab("ask");
+    document.getElementById("questionInput").value = q.slice(1).trim();
+    const resp = await fetchJSON("/api/ask", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ question: q.slice(1).trim() }),
+    });
+    renderAnswer(resp);
+    hideSearchResults();
+    return;
+  }
+  try {
+    await searchTracks(q);
+  } catch (err) {
+    toast("Search failed: " + err.message);
+  }
+});
+
+document.getElementById("globalSearch")?.addEventListener("input", () => {
+  if (!document.getElementById("globalSearch").value.trim()) hideSearchResults();
+});
+
+document.addEventListener("click", e => {
+  if (!e.target.closest(".topbar__search")) hideSearchResults();
 });
 
 /* ── Bridge Sessions ── */
@@ -439,11 +496,27 @@ const GRADIENTS = [
   "linear-gradient(135deg,#f59b23,#e91429)",
 ];
 
+function trackThumbHtml(t, i) {
+  if (t.album_art) {
+    return `<div class="track-row__thumb"><img src="${t.album_art}" alt="" loading="lazy" /></div>`;
+  }
+  return `<div class="track-row__thumb track-row__thumb--fallback" style="background:${GRADIENTS[i % GRADIENTS.length]}">♪</div>`;
+}
+
 function updatePlayer(track, idx) {
   if (!track) return;
   document.getElementById("playerTitle").textContent = track.name;
   document.getElementById("playerArtist").textContent = track.artist;
-  document.getElementById("playerArt").style.background = GRADIENTS[idx % GRADIENTS.length];
+  const artEl = document.getElementById("playerArt");
+  if (track.album_art) {
+    artEl.style.background = "";
+    artEl.style.backgroundImage = `url("${track.album_art}")`;
+    artEl.style.backgroundSize = "cover";
+    artEl.style.backgroundPosition = "center";
+  } else {
+    artEl.style.backgroundImage = "";
+    artEl.style.background = GRADIENTS[idx % GRADIENTS.length];
+  }
   const mins = Math.floor((idx + 1) * 3.75);
   document.getElementById("playerTime").textContent = `0:${String(mins).padStart(2, "0")}`;
   document.getElementById("playerProgress").style.width = `${((idx + 1) / 8) * 100}%`;
@@ -456,7 +529,7 @@ function renderTracks(tracks) {
       <span class="track-row__idx">${t.position}</span>
       <span class="track-row__play-sm">▶</span>
       <div class="track-row__main">
-        <div class="track-row__thumb" style="background:${GRADIENTS[i % GRADIENTS.length]}">♪</div>
+        ${trackThumbHtml(t, i)}
         <div>
           <div class="track-row__title">${t.name}</div>
           <div class="track-row__artist">${t.artist}</div>

@@ -33,13 +33,13 @@ DEMO_TRACKS = [
         "id": "1XKAeevAbxSSMuTcRT0APS",
         "name": "Multi-Love",
         "artist": "Unknown Mortal Orchestra",
-        "album_art": "https://i.scdn.co/image/ab67616d0000b2735c8b444e0e0b0b0b0b0b0b0b",
+        "album_art": "",
     },
     {
         "id": "75IQVo8hqI1iwVZyvkN2VT",
         "name": "Show Me How",
         "artist": "Men I Trust",
-        "album_art": "https://i.scdn.co/image/ab67616d0000b273a91c10b7c4a4c4c4c4c4c4c4",
+        "album_art": "",
     },
     {
         "id": "1MJ5f5EYBC92ADD6xcz7nb",

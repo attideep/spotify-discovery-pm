@@ -22,8 +22,9 @@ from mvp.auth import (
     refreshed_session_cookie,
 )
 from mvp.bridge import BridgeError, create_bridge_session, save_bridge_to_playlist
+from mvp.demo_tracks import DEMO_TRACKS
 from mvp.parse import parse_track_id
-from mvp.track_lookup import lookup_track
+from mvp.track_lookup import enrich_track_meta, lookup_track
 from mvp.session import (
     COOKIE_OAUTH,
     COOKIE_SESSION,
@@ -31,7 +32,7 @@ from mvp.session import (
     oauth_cookie_kwargs,
     session_cookie_kwargs,
 )
-from mvp.spotify_client import SpotifyAPIError
+from mvp.spotify_client import SpotifyAPIError, SpotifyClient, normalize_track
 
 app = FastAPI(
     title="Spotify Discovery Engine",
@@ -107,6 +108,7 @@ def health() -> dict:
         "status": "ok",
         "reviews_indexed": store.count(),
         "spotify_configured": settings.spotify_configured,
+        "catalog_search": settings.spotify_configured,
         "llm_configured": bool(settings.anthropic_api_key),
         "allow_demo_mode": settings.allow_demo_mode,
     }
@@ -254,6 +256,38 @@ def api_track_lookup_post(
     if not track:
         raise HTTPException(404, "Track not found on Spotify — check the link")
     return track
+
+
+@app.get("/api/search/tracks")
+def api_search_tracks(q: str) -> dict:
+    query = q.strip()
+    if not query:
+        raise HTTPException(400, "Enter a song or artist to search")
+
+    settings = get_settings()
+    if settings.spotify_configured:
+        try:
+            client = SpotifyClient.from_client_credentials()
+            items = [normalize_track(t) for t in client.search_tracks(query, limit=12)]
+            return {"tracks": items, "mode": "spotify"}
+        except SpotifyAPIError as e:
+            raise HTTPException(e.status or 502, str(e)) from e
+
+    needle = query.lower()
+    hits = []
+    for d in DEMO_TRACKS:
+        blob = f"{d['name']} {d['artist']}".lower()
+        if needle in blob:
+            hits.append(
+                enrich_track_meta(
+                    {**d, "spotify_url": f"https://open.spotify.com/track/{d['id']}"}
+                )
+            )
+    return {
+        "tracks": hits[:12],
+        "mode": "demo_catalog",
+        "hint": "Add Spotify API keys for full catalog search (see docs/PRODUCTION.md).",
+    }
 
 
 @app.post("/api/bridge")

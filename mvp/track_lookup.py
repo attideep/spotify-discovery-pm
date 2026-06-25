@@ -18,10 +18,25 @@ def _from_demo_catalog(track_id: str) -> dict | None:
     return None
 
 
+def enrich_track_meta(meta: dict) -> dict:
+    """Fill missing album art (and artist) via Spotify oEmbed — no API keys."""
+    if meta.get("album_art"):
+        return meta
+    hit = lookup_track_oembed(meta["id"])
+    if not hit:
+        return meta
+    out = {**meta}
+    if hit.get("album_art"):
+        out["album_art"] = hit["album_art"]
+    if not out.get("artist") and hit.get("artist"):
+        out["artist"] = hit["artist"]
+    return out
+
+
 def lookup_track(track_id: str, client: SpotifyClient | None = None) -> dict | None:
     hit = _from_demo_catalog(track_id)
     if hit:
-        return hit
+        return enrich_track_meta(hit)
 
     if client:
         try:
@@ -29,4 +44,5 @@ def lookup_track(track_id: str, client: SpotifyClient | None = None) -> dict | N
         except Exception:
             pass
 
-    return lookup_track_oembed(track_id)
+    hit = lookup_track_oembed(track_id)
+    return enrich_track_meta(hit) if hit else None

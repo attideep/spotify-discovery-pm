@@ -10,6 +10,7 @@ from mvp.demo_tracks import DEMO_TRACKS
 from mvp.oembed import lookup_track_oembed
 from mvp.parse import track_url
 from mvp.spotify_client import SpotifyAPIError, SpotifyClient, normalize_track
+from mvp.track_lookup import enrich_track_meta
 
 
 class BridgeError(Exception):
@@ -31,36 +32,49 @@ def _dedupe_candidates(candidates: list[dict], exclude_ids: set[str]) -> list[di
     return out
 
 
-def _gather_candidates(client: SpotifyClient | None, anchor: dict, intent: str) -> list[dict]:
-    """Search-based discovery (Recommendations API blocked for new Spotify apps)."""
-    pool: list[dict] = []
+def _catalog_client() -> SpotifyClient | None:
+    try:
+        return SpotifyClient.from_client_credentials()
+    except SpotifyAPIError:
+        return None
 
-    if client:
-        artist_names = anchor.get("artist", "").split(",")[0].strip()
-        queries = [
-            f'artist:"{artist_names}"',
-            intent[:80],
-            f"{artist_names} similar",
-            f"{artist_names} indie",
-        ]
+
+def _gather_candidates(client: SpotifyClient | None, anchor: dict, intent: str) -> list[dict]:
+    """Search-based discovery — uses user token, else app catalog token, else demo pool."""
+    pool: list[dict] = []
+    search_client = client or _catalog_client()
+
+    if search_client:
+        artist_names = (anchor.get("artist") or anchor.get("name") or "").split(",")[0].strip()
+        queries = [intent[:80], f"{artist_names} {intent[:40]}".strip(), f"{artist_names} similar"]
+        if artist_names:
+            queries.insert(0, f'artist:"{artist_names}"')
+        seen_q: set[str] = set()
         for q in queries:
+            q = q.strip()
+            if not q or q in seen_q:
+                continue
+            seen_q.add(q)
             try:
-                for t in client.search_tracks(q, limit=8):
+                for t in search_client.search_tracks(q, limit=10):
                     pool.append(normalize_track(t))
             except SpotifyAPIError:
                 continue
 
-        # Artist top tracks for related artists found in search
-        try:
-            for artist in client.search_artists(artist_names, limit=2):
-                for t in client.artist_top_tracks(artist["id"])[:5]:
-                    pool.append(normalize_track(t))
-        except SpotifyAPIError:
-            pass
+        if artist_names:
+            try:
+                for artist in search_client.search_artists(artist_names, limit=2):
+                    for t in search_client.artist_top_tracks(artist["id"])[:5]:
+                        pool.append(normalize_track(t))
+            except SpotifyAPIError:
+                pass
 
-    # Always merge verified demo pool as fallback enrichment
     for d in DEMO_TRACKS:
-        pool.append({**d, "spotify_url": track_url(d["id"]), "uri": f"spotify:track:{d['id']}"})
+        pool.append(
+            enrich_track_meta(
+                {**d, "spotify_url": track_url(d["id"]), "uri": f"spotify:track:{d['id']}"}
+            )
+        )
 
     return _dedupe_candidates(pool, {anchor["id"]})
 
@@ -138,21 +152,20 @@ def _build_session(
     mode: str,
 ) -> BridgeSession:
     by_id = {c["id"]: c for c in candidates}
-    by_id[anchor["id"]] = anchor
+    by_id[anchor["id"]] = enrich_track_meta(anchor)
     tracks: list[BridgeTrack] = []
 
     for i, step in enumerate(plan[:8]):
         tid = step["id"]
-        meta = by_id.get(tid)
-        if not meta:
-            continue
+        meta = enrich_track_meta(by_id.get(tid) or {"id": tid, "name": tid, "artist": ""})
         tracks.append(
             BridgeTrack(
                 position=len(tracks) + 1,
                 track_id=tid,
                 name=meta["name"],
-                artist=meta["artist"],
+                artist=meta.get("artist", ""),
                 spotify_url=meta.get("spotify_url") or track_url(tid),
+                album_art=meta.get("album_art", ""),
                 explanation=step.get("explanation", ""),
                 novelty_score=float(step.get("novelty_score", 0.2 + i * 0.08)),
             )
@@ -194,7 +207,7 @@ def resolve_anchor(
                 return {**d, "spotify_url": track_url(d["id"]), "uri": f"spotify:track:{d['id']}"}
         oembed = lookup_track_oembed(anchor_track_id)
         if oembed:
-            return oembed
+            return enrich_track_meta(oembed)
         raise BridgeError(
             f"Track not found — check the Spotify link and try again.",
             "track_not_found",

@@ -239,6 +239,78 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   position: relative;
 }
 
+.search-results {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 50;
+  background: #282828;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: var(--radius-md);
+  box-shadow: 0 16px 40px rgba(0,0,0,0.55);
+  max-height: 360px;
+  overflow-y: auto;
+}
+
+.search-results.hidden { display: none; }
+
+.search-result {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.search-result:hover { background: rgba(255,255,255,0.08); }
+
+.search-result__art {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  flex-shrink: 0;
+  background: rgba(255,255,255,0.08);
+}
+
+.search-result__meta { min-width: 0; }
+
+.search-result__title {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-result__artist {
+  font-size: 12px;
+  color: var(--text-subdued);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.search-results__hint {
+  padding: 10px 12px;
+  font-size: 12px;
+  color: var(--text-subdued);
+  border-top: 1px solid rgba(255,255,255,0.06);
+}
+
+.track-row__thumb--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
 .topbar__search input {
   width: 100%;
   background: rgba(255,255,255,0.1);
@@ -962,6 +1034,8 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   height: 48px;
   border-radius: var(--radius-sm);
   background: linear-gradient(135deg, #1ed760, #121212);
+  background-size: cover;
+  background-position: center;
   flex-shrink: 0;
 }
 
