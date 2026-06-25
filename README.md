@@ -58,30 +58,7 @@ bash scripts/smoke_test.sh
 
 ---
 
-## Project structure
-
-```
-api/          FastAPI routes (bridge, search, RAG, insights)
-web/          Static UI (Home, Bridge Sessions, Discovery Lab, Ask Corpus)
-mvp/          Bridge planner, catalog search, Spotify OAuth
-analysis/     Classification, embeddings, clustering, RAG
-ingest/       Review ingestion + seed corpus
-data/         Review corpus + chart catalog
-docs/         Production deployment guide
-```
-
----
-
 ## API
-
-| Endpoint | Description |
-|----------|-------------|
-| `GET /health` | Service status |
-| `POST /api/bridge` | Generate 8-track bridge session |
-| `POST /api/bridge/restore` | Restore an exact shared session from track IDs |
-| `GET /api/search/tracks?q=` | Search tracks by name or artist |
-| `GET /api/insights` | Discovery Lab theme data |
-| `POST /api/ask` | Custom Q&A over the review corpus |
 
 Interactive docs: https://spotify-discovery-pm.vercel.app/docs
 
@@ -104,4 +81,19 @@ See [`docs/PRODUCTION.md`](docs/PRODUCTION.md) for Vercel setup, environment var
 
 ---
 
-Built by [Attideep Raina](https://github.com/attideep). Open an issue if you deploy your own fork.
+## What's in this repo
+
+The public repo contains the **app source** so the product is inspectable and self-hostable. That's normal for a demo product on GitHub.
+
+**Not in the repo (and safe from copy-paste):**
+- Production API keys (`SPOTIFY_*`, `ANTHROPIC_*`, `SESSION_SECRET`) — these live only in Vercel env vars
+- Your live deployment, domain, and users
+- Any private strategy or internal notes
+
+**What someone could fork:** the UI, bridge logic, and bundled track/review datasets needed to run the app locally. They'd still need their own hosting, keys, and brand to ship a competing product.
+
+If you prefer a closed codebase, make the GitHub repo **private** and keep only the live URL public.
+
+---
+
+Built by [Attideep Raina](https://github.com/attideep).

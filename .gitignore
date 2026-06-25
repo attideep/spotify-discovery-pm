@@ -8,8 +8,9 @@ data/*.db
 !data/corpus.json
 !data/chart_catalog.json
 data/.spotify_tracks_dataset.csv
-*.pdf
-!deck/NL Spotify.pdf
+CONTEXT.md
+docs/WORKFLOW.md
+deck/*.pdf
 .DS_Store
 .vercel/
 node_modules/

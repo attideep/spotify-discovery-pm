@@ -207,36 +207,19 @@
       </div>
     </div>
 
-    <!-- Player bar -->
-    <footer class="now-playing">
+    <!-- Preview bar — opens current bridge track in Spotify (not an in-app player) -->
+    <footer class="now-playing hidden" id="previewBar">
       <div class="now-playing__track">
         <div class="now-playing__art" id="playerArt"></div>
         <div class="now-playing__meta">
-          <div class="now-playing__title" id="playerTitle">Select a bridge session</div>
-          <div class="now-playing__artist" id="playerArtist">Bridge Sessions · Beta</div>
+          <div class="now-playing__title" id="playerTitle">Generate a bridge to preview tracks</div>
+          <div class="now-playing__artist" id="playerArtist">Bridge Sessions</div>
         </div>
       </div>
-      <div class="now-playing__controls">
-        <div class="now-playing__btns">
-          <button class="icon-btn" style="width:28px;height:28px;background:transparent" aria-label="Shuffle">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.151 1.533a2.205 2.205 0 0 1 3.083 3.083l-3.083 3.083-1.061-1.061 3.083-3.022a.705.705 0 0 0-.997-.997L11.5 4.455 10.439 3.393l2.712-2.86zM2.205 1.533l3.083 3.083-1.061 1.061L1.144 2.594A.705.705 0 0 0 2.14 1.533zm0 12.934 3.083-3.083 1.061 1.061-3.083 3.083a2.205 2.205 0 0 1-3.083-3.083zm11.79 0a2.205 2.205 0 0 1-3.083 0l-3.083-3.083 1.061-1.061 3.083 3.083a.705.705 0 0 0 .997-.997L11.5 11.545l1.061-1.061 2.712 2.983z"/></svg>
-          </button>
-          <button class="now-playing__play" id="playerPlay" aria-label="Play">
-            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5v11l10-5.5L3 2.5z"/></svg>
-          </button>
-          <button class="icon-btn" style="width:28px;height:28px;background:transparent" aria-label="Repeat">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M0 4.75A3.75 3.75 0 0 1 3.75 1h8.5A3.75 3.75 0 0 1 16 4.75v5a3.75 3.75 0 0 1-3.75 3.75H9.81l1.018 1.018a.75.75 0 1 1-1.06 1.06L6.939 12.75l2.829-2.828a.75.75 0 1 1 1.06 1.06L9.811 12h2.439a2.25 2.25 0 0 0 2.25-2.25v-5a2.25 2.25 0 0 0-2.25-2.25h-8.5A2.25 2.25 0 0 0 1.5 4.75v5A2.25 2.25 0 0 0 3.75 12H5v1.5H3.75A3.75 3.75 0 0 1 0 9.75v-5z"/></svg>
-          </button>
-        </div>
-        <div class="now-playing__progress">
-          <span id="playerTime">0:00</span>
-          <div class="now-playing__bar"><div class="now-playing__bar-fill" id="playerProgress"></div></div>
-          <span>30:00</span>
-        </div>
-      </div>
-      <div class="now-playing__extras">
-        <button class="icon-btn" style="background:transparent;width:28px;height:28px" aria-label="Queue">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M15 15H1v-1.5h14V15zm0-4.5H1V9h14v1.5zm-14-7A2.5 2.5 0 0 1 3.5 1h9a2.5 2.5 0 0 1 0 5h-9A2.5 2.5 0 0 1 1 3.5zm2.5-1a1 1 0 0 0 0 2h9a1 1 0 0 0 0-2h-9z"/></svg>
+      <div class="now-playing__actions">
+        <span class="now-playing__step" id="playerStep"></span>
+        <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="playerOpen">
+          Open in Spotify
         </button>
       </div>
     </footer>

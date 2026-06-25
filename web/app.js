@@ -775,9 +775,15 @@ function trackThumbHtml(t, i) {
 }
 
 function updatePlayer(track, idx) {
-  if (!track) return;
+  const bar = document.getElementById("previewBar");
+  if (!track) {
+    bar?.classList.add("hidden");
+    return;
+  }
+  bar?.classList.remove("hidden");
   document.getElementById("playerTitle").textContent = track.name;
   document.getElementById("playerArtist").textContent = track.artist;
+  document.getElementById("playerStep").textContent = `Track ${idx + 1} of ${currentTracks.length}`;
   const artEl = document.getElementById("playerArt");
   if (track.album_art) {
     artEl.style.background = "";
@@ -788,9 +794,6 @@ function updatePlayer(track, idx) {
     artEl.style.backgroundImage = "";
     artEl.style.background = GRADIENTS[idx % GRADIENTS.length];
   }
-  const mins = Math.floor((idx + 1) * 3.75);
-  document.getElementById("playerTime").textContent = `0:${String(mins).padStart(2, "0")}`;
-  document.getElementById("playerProgress").style.width = `${((idx + 1) / 8) * 100}%`;
 }
 
 function renderTracks(tracks) {
@@ -889,7 +892,7 @@ document.getElementById("savePlaylistBtn")?.addEventListener("click", async () =
   }
 });
 
-document.getElementById("playerPlay")?.addEventListener("click", () => {
+document.getElementById("playerOpen")?.addEventListener("click", () => {
   if (currentTracks.length && currentTracks[currentTrackIdx]?.spotify_url) {
     window.open(currentTracks[currentTrackIdx].spotify_url, "_blank");
   } else {
