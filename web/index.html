@@ -55,7 +55,7 @@
         </div>
         <div class="topbar__search">
           <svg class="topbar__search-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.7 12.3 11 9.6a5.5 5.5 0 1 0-1.4 1.4l2.7 2.7a1 1 0 0 0 1.4-1.4zM6.5 10A3.5 3.5 0 1 1 10 6.5 3.5 3.5 0 0 1 6.5 10z"/></svg>
-          <input type="text" id="globalSearch" placeholder="Search any song on Spotify…" autocomplete="off" />
+          <input type="text" id="globalSearch" placeholder="Search 10,000 chart hits…" autocomplete="off" />
           <div id="searchResults" class="search-results hidden" role="listbox"></div>
         </div>
         <div class="topbar__user">A</div>
@@ -142,8 +142,11 @@
           </div>
 
           <div class="bridge-form">
-            <label class="form-label">Anchor track — paste any public Spotify link</label>
-            <input class="form-input" id="anchorInput" type="text" placeholder="https://open.spotify.com/track/… or leave blank for Khruangbin — Time (You and I)" />
+            <label class="form-label">Anchor track — song name or Spotify link</label>
+            <div class="anchor-search">
+              <input class="form-input" id="anchorInput" type="text" placeholder="e.g. Blinding Lights, The Weeknd — or paste a Spotify link" autocomplete="off" />
+              <div id="anchorSearchResults" class="search-results hidden" role="listbox"></div>
+            </div>
             <div id="anchorPreview" class="anchor-preview hidden"></div>
             <div class="chip-row chip-row--compact" id="anchorChips"></div>
             <label class="form-label">Your intent</label>

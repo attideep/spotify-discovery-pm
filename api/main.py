@@ -23,7 +23,7 @@ from mvp.auth import (
 )
 from mvp.bridge import BridgeError, create_bridge_session, save_bridge_to_playlist
 from mvp.chart_catalog import catalog_count, search_tracks as chart_search
-from mvp.parse import parse_track_id
+from mvp.parse import parse_track_id, resolve_track_query
 from mvp.track_lookup import enrich_track_meta, lookup_track
 from mvp.session import (
     COOKIE_OAUTH,
@@ -247,10 +247,13 @@ def api_track_lookup_post(
     body: dict,
     bridge_session: str | None = Cookie(default=None, alias=COOKIE_SESSION),
 ) -> dict:
-    raw = body.get("anchor", "")
-    tid = parse_track_id(raw)
+    raw = body.get("anchor", "").strip()
+    tid = resolve_track_query(raw)
     if not tid:
-        raise HTTPException(400, "Paste a valid Spotify track link or ID")
+        raise HTTPException(
+            400,
+            "No match — try a song name (e.g. Blinding Lights) or paste a Spotify track link",
+        )
 
     client = client_from_session(bridge_session)
     track = lookup_track(tid, client)
@@ -288,7 +291,12 @@ def api_bridge(
     body: BridgeBody,
     bridge_session: str | None = Cookie(default=None, alias=COOKIE_SESSION),
 ) -> JSONResponse:
-    tid = parse_track_id(body.anchor) if body.anchor else None
+    tid = resolve_track_query(body.anchor) if body.anchor else None
+    if body.anchor and body.anchor.strip() and not tid:
+        raise HTTPException(
+            400,
+            "Could not find that song — try the track title or a Spotify link",
+        )
     client = None if body.demo else client_from_session(bridge_session)
 
     try:

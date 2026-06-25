@@ -20,6 +20,19 @@ def parse_track_id(value: str | None) -> str | None:
     return None
 
 
+def resolve_track_query(value: str | None) -> str | None:
+    """Spotify URL/ID, or best chart-catalog match for a song or artist name."""
+    if not value or not value.strip():
+        return None
+    tid = parse_track_id(value)
+    if tid:
+        return tid
+    from mvp.chart_catalog import search_tracks
+
+    hits = search_tracks(value.strip(), limit=1)
+    return hits[0]["id"] if hits else None
+
+
 def track_url(track_id: str) -> str:
     return f"https://open.spotify.com/track/{track_id}"
 

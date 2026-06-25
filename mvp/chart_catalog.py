@@ -56,6 +56,13 @@ def _tokens(text: str) -> list[str]:
     return [w for w in re.split(r"\W+", text.lower()) if len(w) >= 3 and w not in stop]
 
 
+def _token_in_blob(token: str, blob: str) -> bool:
+    if token in blob:
+        return True
+    stem = re.sub(r"['']?s$", "", token)
+    return len(stem) >= 3 and stem in blob
+
+
 def _match(query: str, track: dict, *, any_token: bool = False) -> bool:
     needle = query.lower().strip()
     if not needle:
@@ -67,8 +74,8 @@ def _match(query: str, track: dict, *, any_token: bool = False) -> bool:
     if not tokens:
         return False
     if any_token:
-        return any(t in blob for t in tokens)
-    return all(t in blob for t in tokens)
+        return any(_token_in_blob(t, blob) for t in tokens)
+    return all(_token_in_blob(t, blob) for t in tokens)
 
 
 def search_tracks(query: str, *, limit: int = 12, any_token: bool = False) -> list[dict]:

@@ -68,6 +68,7 @@ class BridgeTrack(BaseModel):
 
 class BridgeSession(BaseModel):
     anchor_track: str
+    anchor_id: str = ""
     intent: str
     tracks: list[BridgeTrack]
     session_summary: str

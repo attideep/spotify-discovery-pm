@@ -183,6 +183,7 @@ def _build_session(
     )
     return BridgeSession(
         anchor_track=anchor_label,
+        anchor_id=anchor["id"],
         intent=intent,
         tracks=tracks,
         session_summary=summary,

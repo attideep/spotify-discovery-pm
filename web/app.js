@@ -35,7 +35,7 @@ function parseTrackId(raw) {
 
 function buildShareUrl(session) {
   const qs = new URLSearchParams({ intent: session.intent });
-  const anchorId = session._shareAnchor || parseTrackId(document.getElementById("anchorInput")?.value || "");
+  const anchorId = session.anchor_id || session._shareAnchor || parseTrackId(document.getElementById("anchorInput")?.value || "");
   if (anchorId) qs.set("anchor", anchorId);
   return `${location.origin}/#bridge?${qs.toString()}`;
 }
@@ -310,7 +310,34 @@ document.getElementById("logoutBtn")?.addEventListener("click", async () => {
   toast("Logged out");
 });
 
-/* ── Anchor preview ── */
+/* ── Anchor preview + song search ── */
+let anchorSearchTimer = null;
+
+function looksLikeSpotifyRef(raw) {
+  return /spotify\.com\/track\/|spotify:track:/.test(raw) || /^[A-Za-z0-9]{22}$/.test(raw);
+}
+
+function bindSearchResultClicks(container, onPick) {
+  container.querySelectorAll(".search-result").forEach(btn => {
+    btn.addEventListener("click", () => onPick(btn));
+  });
+}
+
+function renderSearchResultsHtml(tracks, hint) {
+  if (!tracks.length) {
+    return `<div class="search-results__hint">No tracks found — try the song title or artist name.</div>`;
+  }
+  return tracks.map(t => `
+    <button type="button" class="search-result" data-url="${t.spotify_url}" data-id="${t.id}">
+      ${t.album_art ? `<img class="search-result__art" src="${t.album_art}" alt="" loading="lazy" />` : `<div class="search-result__art"></div>`}
+      <div class="search-result__meta">
+        <div class="search-result__title">${t.name}</div>
+        <div class="search-result__artist">${t.artist || "Spotify"}</div>
+      </div>
+    </button>
+  `).join("") + (hint ? `<div class="search-results__hint">${hint}</div>` : "");
+}
+
 async function previewAnchor() {
   const raw = document.getElementById("anchorInput").value.trim();
   const preview = document.getElementById("anchorPreview");
@@ -333,8 +360,43 @@ async function previewAnchor() {
   }
 }
 
+async function searchAnchorTracks(q) {
+  const el = document.getElementById("anchorSearchResults");
+  if (!el || !q || looksLikeSpotifyRef(q)) {
+    el?.classList.add("hidden");
+    if (q && looksLikeSpotifyRef(q)) previewAnchor();
+    return;
+  }
+  try {
+    const data = await fetchJSON(`/api/search/tracks?q=${encodeURIComponent(q)}`);
+    el.innerHTML = renderSearchResultsHtml(data.tracks || [], "");
+    el.classList.remove("hidden");
+    bindSearchResultClicks(el, btn => {
+      document.getElementById("anchorInput").value = btn.dataset.url;
+      el.classList.add("hidden");
+      previewAnchor();
+    });
+  } catch {
+    el.classList.add("hidden");
+  }
+}
+
+document.getElementById("anchorInput")?.addEventListener("input", e => {
+  const q = e.target.value.trim();
+  clearTimeout(anchorSearchTimer);
+  if (!q) {
+    document.getElementById("anchorSearchResults")?.classList.add("hidden");
+    document.getElementById("anchorPreview")?.classList.add("hidden");
+    return;
+  }
+  anchorSearchTimer = setTimeout(() => searchAnchorTracks(q), 280);
+});
+
 document.getElementById("anchorInput")?.addEventListener("change", previewAnchor);
-document.getElementById("anchorInput")?.addEventListener("blur", previewAnchor);
+document.getElementById("anchorInput")?.addEventListener("blur", () => {
+  setTimeout(() => document.getElementById("anchorSearchResults")?.classList.add("hidden"), 180);
+  previewAnchor();
+});
 
 /* ── Insights ── */
 function themeLabel(theme) {
@@ -601,30 +663,15 @@ function renderSearchResults(data) {
   const el = document.getElementById("searchResults");
   if (!el) return;
   const tracks = data.tracks || [];
-  if (!tracks.length) {
-    el.innerHTML = `<div class="search-results__hint">No tracks found.</div>`;
-    el.classList.remove("hidden");
-    return;
-  }
-  el.innerHTML = tracks.map(t => `
-    <button type="button" class="search-result" data-url="${t.spotify_url}">
-      ${t.album_art ? `<img class="search-result__art" src="${t.album_art}" alt="" loading="lazy" />` : `<div class="search-result__art"></div>`}
-      <div class="search-result__meta">
-        <div class="search-result__title">${t.name}</div>
-        <div class="search-result__artist">${t.artist || "Spotify"}</div>
-      </div>
-    </button>
-  `).join("") + (data.hint ? `<div class="search-results__hint">${data.hint}</div>` : "");
+  el.innerHTML = renderSearchResultsHtml(tracks, data.hint);
   el.classList.remove("hidden");
-  el.querySelectorAll(".search-result").forEach(btn => {
-    btn.addEventListener("click", () => {
-      switchTab("bridge");
-      document.getElementById("anchorInput").value = btn.dataset.url;
-      previewAnchor();
-      hideSearchResults();
-      document.getElementById("globalSearch").value = "";
-      toast("Anchor track set — add intent and generate bridge");
-    });
+  bindSearchResultClicks(el, btn => {
+    switchTab("bridge");
+    document.getElementById("anchorInput").value = btn.dataset.url;
+    previewAnchor();
+    hideSearchResults();
+    document.getElementById("globalSearch").value = "";
+    toast("Anchor track set — add intent and generate bridge");
   });
 }
 
@@ -633,8 +680,30 @@ async function searchTracks(q) {
   renderSearchResults(data);
 }
 
+let globalSearchTimer = null;
+
+function runGlobalSearch(q) {
+  if (!q) {
+    hideSearchResults();
+    return;
+  }
+  searchTracks(q).catch(err => toast("Search failed: " + err.message));
+}
+
+document.getElementById("globalSearch")?.addEventListener("input", e => {
+  const q = e.target.value.trim();
+  clearTimeout(globalSearchTimer);
+  if (!q) {
+    hideSearchResults();
+    return;
+  }
+  globalSearchTimer = setTimeout(() => runGlobalSearch(q), 300);
+});
+
 document.getElementById("globalSearch")?.addEventListener("keydown", async e => {
   if (e.key !== "Enter") return;
+  e.preventDefault();
+  clearTimeout(globalSearchTimer);
   const q = e.target.value.trim();
   if (!q) return;
   if (q.startsWith("?")) {
@@ -649,19 +718,12 @@ document.getElementById("globalSearch")?.addEventListener("keydown", async e => 
     hideSearchResults();
     return;
   }
-  try {
-    await searchTracks(q);
-  } catch (err) {
-    toast("Search failed: " + err.message);
-  }
-});
-
-document.getElementById("globalSearch")?.addEventListener("input", () => {
-  if (!document.getElementById("globalSearch").value.trim()) hideSearchResults();
+  runGlobalSearch(q);
 });
 
 document.addEventListener("click", e => {
   if (!e.target.closest(".topbar__search")) hideSearchResults();
+  if (!e.target.closest(".anchor-search")) document.getElementById("anchorSearchResults")?.classList.add("hidden");
 });
 
 /* ── Bridge Sessions ── */
@@ -751,7 +813,7 @@ document.getElementById("buildBtn")?.addEventListener("click", async () => {
       body: JSON.stringify({ intent, anchor, demo: !isConnected }),
     });
 
-    session._shareAnchor = parseTrackId(anchor || "");
+    session._shareAnchor = session.anchor_id || parseTrackId(anchor || "");
     displaySession(session);
     toast(`Bridge ready — ${session.tracks.length} tracks`);
   } catch (e) {

@@ -1289,6 +1289,19 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   object-fit: cover;
 }
 
+.anchor-search {
+  position: relative;
+}
+
+.anchor-search .search-results {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  max-height: 280px;
+}
+
 @media (max-width: 768px) {
   .app {
     grid-template-columns: 72px 1fr;
@@ -1302,6 +1315,6 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   .track-list-header { display: none; }
   .track-row { grid-template-columns: 32px 1fr 40px; }
   .track-row__novelty { display: none; }
-  .topbar__search { display: none; }
+  .topbar__search input { font-size: 13px; }
   .insight-grid { grid-template-columns: 1fr; }
 }
