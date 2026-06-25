@@ -73,12 +73,12 @@ function decodeShare(encoded) {
   };
 }
 
-async function tryLoadSharedBridge() {
-  const { tab, params } = parseHashState();
+async function tryLoadSharedBridge(shareParams) {
+  const params = shareParams || parseHashState().params;
   const hasShare = params.get("share") || params.get("intent") || params.get("i");
   if (!hasShare) return;
 
-  switchTab("bridge");
+  switchTab("bridge", { preserveQuery: true });
   clearBridgeError();
   toast("Loading shared bridge…");
 
@@ -114,6 +114,7 @@ async function tryLoadSharedBridge() {
       previewAnchor();
     }
     displaySession(session);
+    document.getElementById("sessionBlock")?.scrollIntoView({ behavior: "smooth", block: "start" });
     toast("Shared bridge session loaded");
   } catch (e) {
     showBridgeError(e.message || "Could not load shared bridge.");
@@ -171,7 +172,7 @@ function clearBridgeError() {
 /* ── Tab navigation ── */
 const TAB_ACCENTS = { home: "home", bridge: "bridge", insights: "insights", ask: "insights" };
 
-function switchTab(tab) {
+function switchTab(tab, { preserveQuery = false } = {}) {
   document.querySelectorAll(".nav-item").forEach(n => {
     n.classList.toggle("active", n.dataset.tab === tab);
   });
@@ -179,7 +180,16 @@ function switchTab(tab) {
   const panel = document.getElementById(`panel-${tab}`);
   if (panel) panel.classList.add("active");
   document.getElementById("mainArea").dataset.accent = TAB_ACCENTS[tab] || "home";
-  history.replaceState(null, "", tab === "home" ? "/" : `/#${tab}`);
+
+  if (tab === "home") {
+    history.replaceState(null, "", "/");
+    return;
+  }
+
+  const query = preserveQuery && location.hash.includes("?")
+    ? location.hash.slice(location.hash.indexOf("?"))
+    : "";
+  history.replaceState(null, "", `/#${tab}${query}`);
 }
 
 function initExampleChips() {
@@ -215,10 +225,17 @@ document.querySelectorAll(".nav-item, .sidebar__list-item, .media-card, [data-ta
   });
 });
 
-const { tab: initialTab, params: hashParams } = parseHashState();
-if (["home", "bridge", "insights", "ask"].includes(initialTab)) switchTab(initialTab);
+const INITIAL_HASH = parseHashState();
+if (["home", "bridge", "insights", "ask"].includes(INITIAL_HASH.tab)) {
+  const hasShareQuery = Boolean(
+    INITIAL_HASH.params.get("share")
+    || INITIAL_HASH.params.get("intent")
+    || INITIAL_HASH.params.get("i"),
+  );
+  switchTab(INITIAL_HASH.tab, { preserveQuery: hasShareQuery });
+}
 
-const urlError = hashParams.get("error");
+const urlError = INITIAL_HASH.params.get("error");
 if (urlError) {
   switchTab("bridge");
   showBridgeError(`Spotify connection failed (${urlError}). Try again.`);
@@ -537,9 +554,9 @@ document.getElementById("playerPlay")?.addEventListener("click", () => {
 
 async function boot() {
   initExampleChips();
-  await refreshAuthUI();
-  await loadInsights();
-  await tryLoadSharedBridge();
+  await refreshAuthUI().catch(() => {});
+  await tryLoadSharedBridge(INITIAL_HASH.params);
+  await loadInsights().catch(() => {});
 }
 
 boot().catch(e => toast("Error: " + e.message));
