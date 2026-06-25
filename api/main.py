@@ -145,7 +145,6 @@ def api_bridge(body: BridgeBody) -> dict:
 
 
 if WEB_DIR.exists():
-    app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
 
     @app.get("/")
     def root() -> FileResponse:
@@ -154,3 +153,5 @@ if WEB_DIR.exists():
     @app.get("/bridge.html")
     def bridge_page() -> FileResponse:
         return FileResponse(WEB_DIR / "bridge.html")
+
+    app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")
