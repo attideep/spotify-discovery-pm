@@ -26,27 +26,36 @@ function parseHashState() {
   return { tab, params };
 }
 
-function encodeShare(session) {
-  const slim = {
-    a: session.anchor_track,
-    i: session.intent,
-    s: session.session_summary,
-    m: session.mode,
-    t: session.tracks.map(t => ({
-      p: t.position,
-      id: t.track_id,
-      n: t.name,
-      ar: t.artist,
-      u: t.spotify_url,
-      e: t.explanation,
-      nv: t.novelty_score,
-    })),
-  };
-  return btoa(unescape(encodeURIComponent(JSON.stringify(slim))));
+function parseTrackId(raw) {
+  if (!raw) return "";
+  const m = raw.match(/track\/([A-Za-z0-9]{22})/);
+  if (m) return m[1];
+  return /^[A-Za-z0-9]{22}$/.test(raw) ? raw : "";
 }
 
+function buildShareUrl(session) {
+  const qs = new URLSearchParams({ intent: session.intent });
+  const anchorId = session._shareAnchor || parseTrackId(document.getElementById("anchorInput")?.value || "");
+  if (anchorId) qs.set("anchor", anchorId);
+  return `${location.origin}/#bridge?${qs.toString()}`;
+}
+
+/** Legacy blob decode — kept for old links; prefer intent+anchor URLs. */
 function decodeShare(encoded) {
-  const slim = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+  const toBytes = (b64) => {
+    let norm = b64.replace(/-/g, "+").replace(/_/g, "/");
+    while (norm.length % 4) norm += "=";
+    const bin = atob(norm);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i += 1) bytes[i] = bin.charCodeAt(i);
+    return new TextDecoder().decode(bytes);
+  };
+  let slim;
+  try {
+    slim = JSON.parse(toBytes(encoded));
+  } catch {
+    slim = JSON.parse(decodeURIComponent(escape(atob(encoded))));
+  }
   return {
     anchor_track: slim.a,
     intent: slim.i,
@@ -62,6 +71,53 @@ function decodeShare(encoded) {
       novelty_score: t.nv,
     })),
   };
+}
+
+async function tryLoadSharedBridge() {
+  const { tab, params } = parseHashState();
+  const hasShare = params.get("share") || params.get("intent") || params.get("i");
+  if (!hasShare) return;
+
+  switchTab("bridge");
+  clearBridgeError();
+  toast("Loading shared bridge…");
+
+  if (params.get("share")) {
+    try {
+      displaySession(decodeShare(params.get("share")));
+      toast("Shared bridge session loaded");
+      return;
+    } catch {
+      /* fall through to intent+anchor if present */
+    }
+  }
+
+  const intent = params.get("intent") || params.get("i");
+  if (!intent) {
+    showBridgeError("Could not load shared bridge — link may be truncated. Generate a new one and copy again.");
+    return;
+  }
+
+  const anchorId = params.get("anchor") || params.get("a");
+  const anchor = anchorId ? `https://open.spotify.com/track/${anchorId}` : null;
+
+  try {
+    const session = await fetchJSON("/api/bridge", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ intent, anchor, demo: !isConnected }),
+    });
+    session._shareAnchor = anchorId || "";
+    document.getElementById("intentInput").value = intent;
+    if (anchor) {
+      document.getElementById("anchorInput").value = anchor;
+      previewAnchor();
+    }
+    displaySession(session);
+    toast("Shared bridge session loaded");
+  } catch (e) {
+    showBridgeError(e.message || "Could not load shared bridge.");
+  }
 }
 
 function displaySession(session) {
@@ -161,17 +217,6 @@ document.querySelectorAll(".nav-item, .sidebar__list-item, .media-card, [data-ta
 
 const { tab: initialTab, params: hashParams } = parseHashState();
 if (["home", "bridge", "insights", "ask"].includes(initialTab)) switchTab(initialTab);
-
-if (hashParams.get("share")) {
-  try {
-    displaySession(decodeShare(hashParams.get("share")));
-    switchTab("bridge");
-    toast("Shared bridge session loaded");
-  } catch {
-    switchTab("bridge");
-    showBridgeError("Could not load shared bridge — link may be invalid.");
-  }
-}
 
 const urlError = hashParams.get("error");
 if (urlError) {
@@ -440,6 +485,7 @@ document.getElementById("buildBtn")?.addEventListener("click", async () => {
       body: JSON.stringify({ intent, anchor, demo: !isConnected }),
     });
 
+    session._shareAnchor = parseTrackId(anchor || "");
     displaySession(session);
     toast(`Bridge ready — ${session.tracks.length} tracks`);
   } catch (e) {
@@ -450,8 +496,7 @@ document.getElementById("buildBtn")?.addEventListener("click", async () => {
 
 document.getElementById("shareBridgeBtn")?.addEventListener("click", async () => {
   if (!lastSession) return;
-  const encoded = encodeShare(lastSession);
-  const url = `${location.origin}/#bridge?share=${encodeURIComponent(encoded)}`;
+  const url = buildShareUrl(lastSession);
   try {
     await navigator.clipboard.writeText(url);
     toast("Share link copied!");
@@ -490,4 +535,11 @@ document.getElementById("playerPlay")?.addEventListener("click", () => {
   }
 });
 
-Promise.all([refreshAuthUI(), loadInsights(), Promise.resolve(initExampleChips())]).catch(e => toast("Error: " + e.message));
+async function boot() {
+  initExampleChips();
+  await refreshAuthUI();
+  await loadInsights();
+  await tryLoadSharedBridge();
+}
+
+boot().catch(e => toast("Error: " + e.message));
