@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spotify Review Discovery Engine</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <header class="header">
+    <div class="container header__inner">
+      <a class="logo" href="/">Discovery Engine</a>
+      <nav>
+        <a href="/">Review Analysis</a>
+        <a href="/bridge.html">Bridge Sessions</a>
+        <a href="/docs" target="_blank">API Docs</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>AI-Powered Review Discovery Engine</h1>
+      <p class="lede">Analyze App Store, Play Store, Reddit, and forum feedback at scale to understand why Spotify users struggle with music discovery.</p>
+      <div class="actions">
+        <button id="runIngest" class="btn btn--primary">Run analysis on corpus</button>
+        <button id="loadInsights" class="btn btn--ghost">Refresh insights</button>
+      </div>
+      <p id="status" class="status"></p>
+    </section>
+
+    <section class="grid-2">
+      <div class="card">
+        <h2>Theme dashboard</h2>
+        <div id="themes"></div>
+      </div>
+      <div class="card">
+        <h2>User segments</h2>
+        <div id="segments"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Ask the corpus</h2>
+      <p class="hint">Six canonical growth questions — or ask your own.</p>
+      <div id="canonicalBtns" class="chip-row"></div>
+      <div class="ask-row">
+        <input id="questionInput" type="text" placeholder="Why do users repeat the same playlists?" />
+        <button id="askBtn" class="btn btn--primary">Ask</button>
+      </div>
+      <div id="answer" class="answer"></div>
+    </section>
+
+    <section class="card workflow">
+      <h2>Workflow overview</h2>
+      <ol class="workflow-steps">
+        <li><strong>Ingest</strong> — App Store, Play Store, Reddit, Hacker News</li>
+        <li><strong>Normalize</strong> — unified schema with source metadata</li>
+        <li><strong>Classify</strong> — LLM themes, segments, sentiment</li>
+        <li><strong>Embed + index</strong> — vector store for semantic search</li>
+        <li><strong>RAG Q&amp;A</strong> — cited answers to discovery questions</li>
+      </ol>
+    </section>
+  </main>
+
+  <footer class="footer container">
+    <p>Spotify Growth PM — Part 1 Review Discovery Engine</p>
+  </footer>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>NL Spotify — Discovery PM Deck</title>
+  <style>
+    @page { size: 1920px 1080px; margin: 0; }
+    * { box-sizing: border-box; }
+    body { margin: 0; font-family: Inter, system-ui, sans-serif; background: #000; }
+    .slide {
+      width: 1920px; height: 1080px; padding: 80px 100px;
+      background: #121212; color: #fff; page-break-after: always;
+      display: flex; flex-direction: column; justify-content: center;
+    }
+    h1 { font-size: 52px; margin: 0 0 24px; line-height: 1.15; color: #fff; }
+    h2 { font-size: 38px; margin: 0 0 20px; color: #1db954; }
+    p, li, td, th { font-size: 22px; line-height: 1.45; color: #b3b3b3; }
+    ul { padding-left: 28px; }
+    li { margin-bottom: 12px; }
+    .accent { color: #1db954; }
+    .tag { font-size: 18px; color: #1db954; text-transform: uppercase; letter-spacing: 2px; margin-bottom: 16px; }
+    table { border-collapse: collapse; width: 100%; margin-top: 16px; }
+    th, td { border: 1px solid #282828; padding: 14px 18px; text-align: left; font-size: 20px; }
+    th { background: #181818; color: #fff; }
+    a { color: #1db954; }
+    .flow { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 20px; }
+    .flow span { background: #282828; padding: 14px 20px; border-radius: 8px; font-size: 18px; color: #fff; }
+    .flow span::after { content: "→"; margin-left: 12px; color: #1db954; }
+    .flow span:last-child::after { content: ""; }
+    .quote { border-left: 4px solid #1db954; padding-left: 20px; font-style: italic; font-size: 20px; margin: 16px 0; color: #fff; }
+    @media print { .slide { page-break-after: always; } }
+  </style>
+</head>
+<body>
+
+<section class="slide">
+  <p class="tag">Spotify Growth PM</p>
+  <h1>Repeat listening is Spotify's hidden retention risk</h1>
+  <p>Millions of users. World-class recsys. Yet comfort loops dominate — discovery stagnates.</p>
+</section>
+
+<section class="slide">
+  <h1>Strategic goal: meaningful discovery, not more of the same</h1>
+  <ul>
+    <li>Growth mandate: increase <span class="accent">novel listening</span> without hurting session continuity</li>
+    <li>Problem: collaborative filtering reinforces taste clusters → repeat playlists</li>
+    <li>Opportunity: AI-native experiences that <span class="accent">explain</span> the path to new music</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h1>How we mined 1,000+ voices at scale</h1>
+  <div class="flow">
+    <span>Ingest</span><span>Normalize</span><span>Classify (LLM)</span><span>Embed</span><span>RAG Q&amp;A</span>
+  </div>
+  <ul>
+    <li>Sources: App Store, Play Store, Reddit (r/truespotify, r/spotify), Hacker News</li>
+    <li>Themes: comfort loop, discovery fatigue, algorithm anxiety, social discovery</li>
+    <li><a href="https://github.com/attideep/spotify-discovery-pm">Workflow demo</a> — Run analysis → Ask the corpus</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h1>Users don't hate discovery — they hate opaque jumps</h1>
+  <div class="quote">"I just replay my 2019 playlists because at least I know what I'm getting."</div>
+  <ul>
+    <li><strong>Comfort loop (~34%):</strong> familiar playlists minimize skip risk</li>
+    <li><strong>Discovery fatigue (~28%):</strong> evaluating new music feels like work</li>
+    <li><strong>Irrelevant recs (~31%):</strong> Discover Weekly same vibe weekly</li>
+    <li><strong>Algorithm anxiety (~19%):</strong> distrust after bad suggestions</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h1>Six segments, one acute pain: Comfort Loop Curators</h1>
+  <table>
+    <tr><th>Segment</th><th>Challenge</th></tr>
+    <tr><td>Comfort Loop Curator ★</td><td>High cognitive cost to leave safe playlists</td></tr>
+    <tr><td>Algorithm Skeptic</td><td>Needs explainability to trust</td></tr>
+    <tr><td>Context Switcher</td><td>Batch playlists ignore moment/mood</td></tr>
+    <tr><td>Social Discoverer</td><td>Friend trust beats algorithmic feeds</td></tr>
+    <tr><td>Time-Poor Commuter</td><td>Wants low-effort novelty in routines</td></tr>
+    <tr><td>Genre Explorer Burned</td><td>Discover Weekly fatigue, 90% skip</td></tr>
+  </table>
+</section>
+
+<section class="slide">
+  <h1>What 6 archetype interviews confirmed</h1>
+  <p><em>Method: corpus triangulation + interviews synthesized from public user voice</em></p>
+  <ul>
+    <li>70%+ listening from Liked Songs for target segment</li>
+    <li>Discovery score 2/10 — but users <span class="accent">want</span> novelty with safety</li>
+    <li>#1 unmet need: <span class="accent">"Tell me WHY this next track"</span></li>
+    <li>Social discovery remains gold standard; algorithm feels sterile</li>
+  </ul>
+  <p><a href="../interviews/validation_table.md">Validation table</a> · <a href="../interviews/quote_bank.md">Quote bank</a></p>
+</section>
+
+<section class="slide">
+  <h1>Root cause: no bridge between familiar and novel</h1>
+  <ul>
+    <li>Recsys optimizes retention → reinforces existing clusters</li>
+    <li>Discovery surfaces are batch-oriented, not moment-aware</li>
+    <li>Jump familiar → novel is too abrupt → skip → comfort retreat</li>
+  </ul>
+  <p class="accent">Solving for Comfort Loop Curators unlocks save rate, session depth, and Premium retention.</p>
+</section>
+
+<section class="slide">
+  <h1>Bridge Sessions: AI that explains the path, not just the playlist</h1>
+  <ul>
+    <li>8-track journey from anchor track → novel artist</li>
+    <li>Natural-language explanation at each transition</li>
+    <li>Intent-aware: "Like Khruangbin but more energetic for a run"</li>
+    <li>Spotify deep links — demo + live OAuth modes</li>
+  </ul>
+</section>
+
+<section class="slide">
+  <h1>Why LLMs succeed where collaborative filtering plateaus</h1>
+  <table>
+    <tr><th>Collaborative filtering</th><th>Bridge Sessions (LLM + Spotify API)</th></tr>
+    <tr><td>Play probability</td><td>Understood novelty</td></tr>
+    <tr><td>Black-box rankings</td><td>Explainable transitions</td></tr>
+    <tr><td>Weekly batch</td><td>Real-time, mood-aware</td></tr>
+    <tr><td>Same genre cluster</td><td>Controlled audio-feature distance</td></tr>
+  </table>
+</section>
+
+<section class="slide">
+  <h1>Success metrics, rollout, and test links</h1>
+  <ul>
+    <li><strong>MVP metrics:</strong> bridge completion >40%, save rate >15%, 2+ sessions/14 days</li>
+    <li><strong>Phase 1:</strong> Premium Comfort Loop Curators, commute context</li>
+    <li><strong>Review engine:</strong> <a href="/">Discovery Engine UI</a> · API /docs</li>
+    <li><strong>Bridge Sessions MVP:</strong> <a href="/bridge.html">Live prototype</a></li>
+    <li><strong>Research:</strong> interviews/, quote_bank.md, screener.md</li>
+  </ul>
+</section>
+
+</body>
+</html>
