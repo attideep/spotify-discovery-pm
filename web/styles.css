@@ -1571,11 +1571,20 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   font-size: 13px;
 }
 
-.anchor-preview img {
+.anchor-preview img,
+.anchor-preview__art-fallback {
   width: 48px;
   height: 48px;
   border-radius: var(--radius-sm);
   object-fit: cover;
+  flex-shrink: 0;
+}
+
+.anchor-preview__art-fallback {
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, #1ed760, #169c46);
+  font-size: 18px;
 }
 
 .bridge-error {

@@ -23,10 +23,11 @@ def _from_static_catalog(track_id: str) -> dict | None:
 
 
 def enrich_track_meta(meta: dict) -> dict:
-    """Fill missing album art (and artist) via Spotify oEmbed — no API keys."""
-    if meta.get("album_art"):
+    """Refresh album art (and artist) via Spotify oEmbed — cached URLs go stale."""
+    tid = meta.get("id")
+    if not tid:
         return meta
-    hit = lookup_track_oembed(meta["id"])
+    hit = lookup_track_oembed(tid)
     if not hit:
         return meta
     out = {**meta}
@@ -34,6 +35,8 @@ def enrich_track_meta(meta: dict) -> dict:
         out["album_art"] = hit["album_art"]
     if not out.get("artist") and hit.get("artist"):
         out["artist"] = hit["artist"]
+    if hit.get("name") and (not out.get("name") or out.get("name") == tid):
+        out["name"] = hit["name"]
     return out
 
 

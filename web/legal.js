@@ -32,7 +32,7 @@
         </div>`;
     },
 
-    surpriseMe() {
+    async surpriseMe() {
       const anchors = window.EXAMPLE_ANCHORS || [];
       const intents = window.CONTEXT_INTENTS || [];
       if (!anchors.length) return;
@@ -40,7 +40,7 @@
       const c = intents[Math.floor(Math.random() * intents.length)];
       document.getElementById("anchorInput").value = a.url;
       document.getElementById("intentInput").value = c.text;
-      window.previewAnchor?.();
+      await window.previewAnchor?.();
       window.toast?.("Surprise bridge — hit Generate!");
     },
 

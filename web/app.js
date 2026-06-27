@@ -410,10 +410,13 @@ async function previewAnchor() {
       body: JSON.stringify({ anchor: raw }),
     });
     preview.classList.remove("hidden");
+    const art = track.album_art
+      ? `<img src="${escapeHtml(track.album_art)}" alt="" loading="lazy" referrerpolicy="no-referrer" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'anchor-preview__art-fallback',textContent:'♪'}))" />`
+      : `<div class="anchor-preview__art-fallback">♪</div>`;
     preview.innerHTML = `
-      ${track.album_art ? `<img src="${track.album_art}" alt="" />` : ""}
-      <div><strong>${track.name}</strong><br/><span style="color:var(--text-subdued)">${track.artist || "Spotify track"}</span></div>`;
-  } catch (e) {
+      ${art}
+      <div><strong>${escapeHtml(track.name)}</strong><br/><span style="color:var(--text-subdued)">${escapeHtml(track.artist || "Spotify track")}</span></div>`;
+  } catch {
     preview.classList.add("hidden");
   }
 }
@@ -908,12 +911,6 @@ function renderTracks(tracks, { animate = false } = {}) {
 
 document.getElementById("surpriseBtn")?.addEventListener("click", () => {
   window.BridgeExtras?.surpriseMe();
-});
-
-document.getElementById("comfortLoopCta")?.addEventListener("click", () => {
-  switchTab("bridge");
-  document.getElementById("intentInput").value = CONTEXT_INTENTS[0].text;
-  document.getElementById("anchorInput")?.focus();
 });
 
 document.getElementById("startBridgeBtn")?.addEventListener("click", () => {
