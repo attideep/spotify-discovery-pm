@@ -32,7 +32,8 @@ Set in Vercel → Project → Settings → Environment Variables:
 | `SPOTIFY_CLIENT_SECRET` | Live mode | Same app |
 | `SPOTIFY_REDIRECT_URI` | Live OAuth | `https://spotify-discovery-pm.vercel.app/mvp/callback` |
 | `SESSION_SECRET` | Live OAuth | Random 64-char hex |
-| `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Optional | Gemini bridge planner + embeddings; heuristic fallback without it |
+| `OPENAI_API_KEY` | Optional | Bridge planner (`gpt-4o-mini`); Smart match fallback without it |
+| `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Optional | Review embeddings only |
 | `ANTHROPIC_API_KEY` | Optional | Richer Ask Corpus answers (RAG) |
 | `ALLOW_DEMO_MODE` | Optional | `true` (default) — public demo without login |
 | `MOCK_MODE` | Optional | `false` in production; `true` skips live review ingest |
@@ -67,7 +68,7 @@ OAuth is capped at 5 users in Spotify Dev Mode until Extended Quota is approved 
 
 1. **Connect Spotify** → OAuth → HttpOnly cookie session
 2. Optional: paste track URL as anchor
-3. Generate bridge → Search API gathers candidates → Gemini plans 8 tracks
+3. Generate bridge → chart catalog candidates → OpenAI plans 8 tracks (or Smart match)
 4. **Save to Spotify** → creates private playlist in your account
 
 ---
@@ -77,7 +78,7 @@ OAuth is capped at 5 users in Spotify Dev Mode until Extended Quota is approved 
 - **Routing:** `vercel.json` routes all paths to `api/main.py`; static files served from `web/`
 - **Auth:** OAuth tokens in signed HttpOnly cookies (not URL params); PKCE verifier in short-lived cookie (serverless-safe)
 - **Search:** Spotify Search API when configured; falls back to static `data/chart_catalog.json` (10k tracks, no API cost)
-- **Bridge planner:** Gemini when `GEMINI_API_KEY` or `GOOGLE_API_KEY` set; heuristic fallback otherwise
+- **Bridge planner:** OpenAI when `OPENAI_API_KEY` set and billed; heuristic fallback otherwise
 - **Errors:** Explicit codes (`auth_required`, `track_not_found`, etc.) — no silent fallback to fake tracks on live errors
 
 ---

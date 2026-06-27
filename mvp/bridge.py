@@ -5,6 +5,8 @@ import re
 from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from typing import Any
 
+import httpx
+
 from discovery.config import get_settings
 from discovery.models import BridgeSession, BridgeTrack
 from mvp.chart_catalog import bridge_candidates, get_track, _stable_seed, _tokens, _token_in_blob, _track_key
@@ -104,8 +106,6 @@ def _plan_with_llm(
     if not settings.bridge_planner_configured:
         return _plan_heuristic(anchor, candidates, intent), "heuristic"
 
-    import google.generativeai as genai
-
     valid_ids = {c["id"] for c in candidates}
     catalog = [
         {"id": c["id"], "name": c["name"], "artist": c["artist"]}
@@ -133,18 +133,24 @@ CATALOG:
 Return JSON only:
 {{"tracks": [{{"id": "...", "explanation": "...", "novelty_score": 0.0-1.0}}]}}"""
 
-    def _gemini_call() -> str:
-        genai.configure(api_key=settings.effective_gemini_key)
-        model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(
-            prompt,
-            request_options={"timeout": 8},
-        )
-        return response.text or ""
+    def _openai_call() -> str:
+        with httpx.Client(timeout=8.0) as client:
+            response = client.post(
+                "https://api.openai.com/v1/chat/completions",
+                headers={"Authorization": f"Bearer {settings.effective_openai_key}"},
+                json={
+                    "model": "gpt-4o-mini",
+                    "messages": [{"role": "user", "content": prompt}],
+                    "response_format": {"type": "json_object"},
+                    "temperature": 0.4,
+                },
+            )
+            response.raise_for_status()
+            return response.json()["choices"][0]["message"]["content"] or ""
 
     try:
         with ThreadPoolExecutor(max_workers=1) as pool:
-            raw = pool.submit(_gemini_call).result(timeout=8)
+            raw = pool.submit(_openai_call).result(timeout=8)
         match = re.search(r"\{.*\}", raw, re.S)
         if not match:
             raise ValueError("no JSON in planner response")
@@ -154,7 +160,7 @@ Return JSON only:
             if t.get("id") in valid_ids
         ]
         if len(plan) >= 8:
-            return plan[:8], "gemini"
+            return plan[:8], "openai"
     except (FuturesTimeout, Exception):
         pass
     return _plan_heuristic(anchor, candidates, intent), "heuristic"
@@ -286,7 +292,7 @@ def _build_session(
     if len(tracks) < 8:
         raise BridgeError("Could not build 8-track bridge — try a different anchor or intent.", "insufficient_tracks")
 
-    if planner in ("gemini", "claude"):
+    if planner in ("openai", "gemini", "claude"):
         summary = (
             f"AI-planned bridge from {anchor['name']} — each step explains the path toward your intent."
         )

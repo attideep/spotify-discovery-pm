@@ -8,6 +8,7 @@ class Settings(BaseSettings):
 
     mock_mode: bool = False
     anthropic_api_key: str = ""
+    openai_api_key: str = ""
     gemini_api_key: str = ""
     google_api_key: str = ""
     database_url: str = ""
@@ -23,18 +24,27 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 30
 
     @property
+    def effective_openai_key(self) -> str:
+        return self.openai_api_key.strip()
+
+    @property
+    def openai_api_key_valid(self) -> bool:
+        key = self.effective_openai_key
+        return key.startswith("sk-") and len(key) >= 20
+
+    @property
     def effective_gemini_key(self) -> str:
         return (self.gemini_api_key or self.google_api_key).strip()
 
     @property
     def gemini_api_key_valid(self) -> bool:
-        """Google AI Studio keys start with AIza — other formats hang or 401."""
+        """Google AI Studio keys start with AIza — used only for optional embeddings."""
         key = self.effective_gemini_key
         return key.startswith("AIza") and len(key) >= 30
 
     @property
     def bridge_planner_configured(self) -> bool:
-        return self.gemini_api_key_valid
+        return self.openai_api_key_valid
 
     @property
     def spotify_configured(self) -> bool:

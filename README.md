@@ -83,7 +83,8 @@ See [`docs/PRODUCTION.md`](docs/PRODUCTION.md) for Vercel setup, environment var
 | Variable | Purpose |
 |----------|---------|
 | `ALLOW_DEMO_MODE` | Public free mode without login (default in production) |
-| `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Gemini bridge planner (shows **AI planned** badge) + review embeddings |
+| `OPENAI_API_KEY` | OpenAI bridge planner (shows **AI planned** badge); Smart match fallback without |
+| `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Optional review embeddings only |
 | `ANTHROPIC_API_KEY` | Optional — richer Ask Corpus answers (RAG) |
 | `DATABASE_URL` | Optional Supabase — bridge analytics + distributed rate limits |
 | `RATE_LIMIT_PER_MINUTE` | Abuse protection (default 30) |
@@ -97,7 +98,7 @@ See [`docs/PRODUCTION.md`](docs/PRODUCTION.md) for Vercel setup, environment var
 The public repo contains the **app source** so the product is inspectable and self-hostable. That's normal for a demo product on GitHub.
 
 **Not in the repo (and safe from copy-paste):**
-- Production API keys (`SPOTIFY_*`, `GEMINI_*` / `GOOGLE_API_KEY`, `ANTHROPIC_*`, `SESSION_SECRET`) — these live only in Vercel env vars
+- Production API keys (`SPOTIFY_*`, `OPENAI_API_KEY`, `ANTHROPIC_*`, `SESSION_SECRET`) — these live only in Vercel env vars
 - Your live deployment, domain, and users
 - Any private strategy or internal notes
 

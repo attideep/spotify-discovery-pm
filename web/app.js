@@ -21,6 +21,7 @@ const CONTEXT_INTENTS = [
 ];
 
 const PLANNER_LABELS = {
+  openai: "AI planned",
   gemini: "AI planned",
   claude: "AI planned",
   heuristic: "Smart match",

@@ -54,7 +54,7 @@ class ReviewStore:
 
     def embed(self, text: str) -> list[float]:
         settings = get_settings()
-        if settings.effective_gemini_key:
+        if settings.gemini_api_key_valid:
             try:
                 import google.generativeai as genai
 
