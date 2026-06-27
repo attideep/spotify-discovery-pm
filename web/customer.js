@@ -91,7 +91,18 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ email, password, display_name }),
         });
-        const data = await r.json();
+        const raw = await r.text();
+        let data = {};
+        try {
+          data = raw ? JSON.parse(raw) : {};
+        } catch {
+          const snippet = raw.replace(/\s+/g, " ").trim().slice(0, 80);
+          throw new Error(
+            r.ok
+              ? "Unexpected server response."
+              : snippet || `Sign-in failed (${r.status}). Please try again.`
+          );
+        }
         if (!r.ok) throw new Error(data.detail || data.error || "Auth failed");
         this.closeAuth();
         await this.refreshAuth();

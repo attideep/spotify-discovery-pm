@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import uuid
 from datetime import datetime, timezone
@@ -36,8 +37,14 @@ CREATE TABLE IF NOT EXISTS saved_bridges (
 CREATE INDEX IF NOT EXISTS idx_saved_bridges_user ON saved_bridges(user_id, created_at DESC);
 """
 
-_SQLITE_PATH = Path(__file__).resolve().parent.parent / "data" / "users.db"
 _user_schema_ready = False
+
+
+def _sqlite_path() -> Path:
+    """Vercel serverless has a read-only project dir; only /tmp is writable."""
+    if os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"):
+        return Path("/tmp") / "spotify-discovery-users.db"
+    return Path(__file__).resolve().parent.parent / "data" / "users.db"
 
 
 def _now_iso() -> str:
@@ -54,8 +61,9 @@ def _pg_conn():
 
 
 def _sqlite_conn() -> sqlite3.Connection:
-    _SQLITE_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(_SQLITE_PATH))
+    path = _sqlite_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     return conn
 
@@ -63,8 +71,8 @@ def _sqlite_conn() -> sqlite3.Connection:
 def storage_mode() -> str:
     if get_settings().database_url.strip():
         return "postgres"
-    if _SQLITE_PATH.parent.exists():
-        return "sqlite"
+    if os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"):
+        return "sqlite-ephemeral"
     return "sqlite"
 
 
@@ -176,6 +184,8 @@ def create_user(
         conn.close()
         return {k: v for k, v in row.items() if k != "password_hash"}
     except sqlite3.IntegrityError:
+        return None
+    except Exception:
         return None
 
 

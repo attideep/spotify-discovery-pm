@@ -25,14 +25,17 @@ GOOGLE_USERINFO_URL = "https://www.googleapis.com/oauth2/v3/userinfo"
 
 def hash_password(password: str) -> str:
     salt = secrets.token_hex(16)
-    digest = hashlib.scrypt(
-        password.encode("utf-8"),
-        salt=salt.encode("utf-8"),
-        n=2**14,
-        r=8,
-        p=1,
-        dklen=32,
-    )
+    try:
+        digest = hashlib.scrypt(
+            password.encode("utf-8"),
+            salt=salt.encode("utf-8"),
+            n=2**14,
+            r=8,
+            p=1,
+            dklen=32,
+        )
+    except (MemoryError, OverflowError, ValueError) as exc:
+        raise RuntimeError("Password hashing unavailable in this environment.") from exc
     return f"scrypt${salt}${digest.hex()}"
 
 
@@ -63,9 +66,13 @@ def register_user(email: str, password: str, display_name: str = "") -> tuple[di
         return None, "Enter a valid email address."
     if get_user_by_email(email):
         return None, "An account with this email already exists. Try signing in."
+    try:
+        password_hash = hash_password(password)
+    except RuntimeError:
+        return None, "Account sign-up is temporarily unavailable. Please try again later."
     user = create_user(
         email=email,
-        password_hash=hash_password(password),
+        password_hash=password_hash,
         display_name=display_name.strip(),
     )
     if not user:

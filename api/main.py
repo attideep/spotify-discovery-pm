@@ -300,24 +300,38 @@ def app_user_status(app_user: str | None = Cookie(default=None, alias=COOKIE_APP
 
 @app.post("/api/auth/signup")
 def app_signup(body: SignupBody, request: Request) -> JSONResponse:
-    enforce_rate_limit(request, scope="auth")
-    user, err = register_user(body.email, body.password, body.display_name)
-    if err:
-        raise HTTPException(400, err)
-    resp = JSONResponse(public_auth_status(user))
-    resp.set_cookie(**app_user_cookie_kwargs(pack_app_user(user["id"], user["email"], user.get("display_name", ""))))
-    return resp
+    try:
+        enforce_rate_limit(request, scope="auth")
+        user, err = register_user(body.email, body.password, body.display_name)
+        if err:
+            raise HTTPException(400, err)
+        if not user:
+            raise HTTPException(400, "Could not create account.")
+        resp = JSONResponse(public_auth_status(user))
+        resp.set_cookie(**app_user_cookie_kwargs(pack_app_user(user["id"], user["email"], user.get("display_name", ""))))
+        return resp
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(503, "Account sign-up is temporarily unavailable. Please try again later.")
 
 
 @app.post("/api/auth/login")
 def app_login(body: LoginBody, request: Request) -> JSONResponse:
-    enforce_rate_limit(request, scope="auth")
-    user, err = login_user(body.email, body.password)
-    if err:
-        raise HTTPException(401, err)
-    resp = JSONResponse(public_auth_status(user))
-    resp.set_cookie(**app_user_cookie_kwargs(pack_app_user(user["id"], user["email"], user.get("display_name", ""))))
-    return resp
+    try:
+        enforce_rate_limit(request, scope="auth")
+        user, err = login_user(body.email, body.password)
+        if err:
+            raise HTTPException(401, err)
+        if not user:
+            raise HTTPException(401, "Invalid email or password.")
+        resp = JSONResponse(public_auth_status(user))
+        resp.set_cookie(**app_user_cookie_kwargs(pack_app_user(user["id"], user["email"], user.get("display_name", ""))))
+        return resp
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(503, "Sign-in is temporarily unavailable. Please try again later.")
 
 
 @app.post("/api/auth/logout")
