@@ -15,7 +15,7 @@
 4. **Generate bridge session** — watch the loader, then review 8 tracks with transition notes
 5. **Copy share link** → open in a new tab — same intent and same 8 tracks
 
-**What to notice:** Each step explains the transition. Planner badge shows **AI planned** (with Anthropic key) or **Smart match** (heuristic).
+**What to notice:** Each step explains the transition. Planner badge shows **AI planned** (with Gemini key) or **Smart match** (heuristic).
 
 ---
 
@@ -48,7 +48,7 @@
 Requires Spotify Developer app + Premium on developer account (2026 policy).
 
 Set in Vercel: `SPOTIFY_CLIENT_ID`, `SPOTIFY_CLIENT_SECRET`, `SESSION_SECRET`  
-Optional: `ANTHROPIC_API_KEY` for Claude bridge planning
+Optional: `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) for Gemini bridge planning
 
 ---
 

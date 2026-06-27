@@ -100,10 +100,10 @@ def _plan_with_llm(
     intent: str,
 ) -> tuple[list[dict], str]:
     settings = get_settings()
-    if not settings.anthropic_api_key:
+    if not settings.bridge_planner_configured:
         return _plan_heuristic(anchor, candidates, intent), "heuristic"
 
-    import anthropic
+    import google.generativeai as genai
 
     valid_ids = {c["id"] for c in candidates}
     catalog = [
@@ -132,21 +132,18 @@ CATALOG:
 Return JSON only:
 {{"tracks": [{{"id": "...", "explanation": "...", "novelty_score": 0.0-1.0}}]}}"""
 
-    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
     try:
-        msg = client.messages.create(
-            model="claude-3-5-haiku-20241022",
-            max_tokens=1400,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        raw = msg.content[0].text
+        genai.configure(api_key=settings.effective_gemini_key)
+        model = genai.GenerativeModel("gemini-2.0-flash")
+        response = model.generate_content(prompt)
+        raw = response.text or ""
         data = json.loads(re.search(r"\{.*\}", raw, re.S).group())
         plan = [
             t for t in data.get("tracks", [])
             if t.get("id") in valid_ids
         ]
         if len(plan) >= 8:
-            return plan[:8], "claude"
+            return plan[:8], "gemini"
     except Exception:
         pass
     return _plan_heuristic(anchor, candidates, intent), "heuristic"
@@ -278,7 +275,7 @@ def _build_session(
     if len(tracks) < 8:
         raise BridgeError("Could not build 8-track bridge — try a different anchor or intent.", "insufficient_tracks")
 
-    if planner == "claude":
+    if planner in ("gemini", "claude"):
         summary = (
             f"AI-planned bridge from {anchor['name']} — each step explains the path toward your intent."
         )

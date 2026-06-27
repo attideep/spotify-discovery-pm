@@ -54,11 +54,11 @@ class ReviewStore:
 
     def embed(self, text: str) -> list[float]:
         settings = get_settings()
-        if settings.gemini_api_key:
+        if settings.effective_gemini_key:
             try:
                 import google.generativeai as genai
 
-                genai.configure(api_key=settings.gemini_api_key)
+                genai.configure(api_key=settings.effective_gemini_key)
                 result = genai.embed_content(
                     model="models/text-embedding-004",
                     content=text,

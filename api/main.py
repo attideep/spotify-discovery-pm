@@ -119,7 +119,7 @@ def health() -> dict:
         "spotify_configured": settings.spotify_configured,
         "catalog_search": settings.spotify_configured or catalog_count() > 0,
         "chart_catalog_tracks": catalog_count(),
-        "llm_configured": bool(settings.anthropic_api_key),
+        "llm_configured": settings.bridge_planner_configured,
         "allow_demo_mode": settings.allow_demo_mode,
         "persistence_enabled": settings.persistence_enabled,
         "rate_limit_per_minute": settings.rate_limit_per_minute,
@@ -131,7 +131,7 @@ def api_metrics() -> dict:
     settings = get_settings()
     base = {
         "status": "ok",
-        "llm_configured": bool(settings.anthropic_api_key),
+        "llm_configured": settings.bridge_planner_configured,
         "rate_limit_per_minute": settings.rate_limit_per_minute,
     }
     base.update(metrics_summary())
