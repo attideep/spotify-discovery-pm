@@ -182,13 +182,17 @@ function displaySession(session) {
   lastSession = session;
   window.lastSession = session;
   const sessionBlock = document.getElementById("sessionBlock");
+  if (!sessionBlock) return;
   sessionBlock.classList.remove("hidden");
   sessionBlock.classList.remove("session-block");
   void sessionBlock.offsetWidth;
   sessionBlock.classList.add("session-block");
-  document.getElementById("sessionTitle").textContent = `Bridge from ${session.anchor_track}`;
-  document.getElementById("sessionSummary").textContent = session.session_summary;
-  document.getElementById("sessionMode").textContent = BRIDGE_ONLY ? "" : "Free";
+  const titleEl = document.getElementById("sessionTitle");
+  const summaryEl = document.getElementById("sessionSummary");
+  const modeEl = document.getElementById("sessionMode");
+  if (titleEl) titleEl.textContent = `Bridge from ${session.anchor_track}`;
+  if (summaryEl) summaryEl.textContent = session.session_summary;
+  if (modeEl) modeEl.textContent = BRIDGE_ONLY ? "" : "Free";
   const plannerEl = document.getElementById("sessionPlanner");
   const plannerLabel = PLANNER_LABELS[session.planner] || "";
   if (plannerEl) {
