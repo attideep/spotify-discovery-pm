@@ -650,12 +650,16 @@
   background: rgba(30, 215, 96, 0.22);
 }
 
-/* Compact player — grid layout in narrow column (desktop sidebar + mobile) */
+/* Compact player — responsive grid (phone, tablet, desktop sidebar) */
+.app--bridge-only .bridge-player--minimal {
+  padding: 12px 14px 10px;
+}
+
 .app--bridge-only .bridge-player--minimal .bridge-player__row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   grid-template-rows: auto auto auto;
-  gap: 8px 10px;
+  gap: 10px 12px;
   align-items: center;
 }
 
@@ -701,43 +705,92 @@
   align-self: center;
 }
 
-.app--bridge-only .bridge-player--minimal .bridge-player__controls {
+.app--bridge-only .bridge-player--minimal .bridge-player__transport {
   grid-column: 1 / -1;
   grid-row: 2;
-  justify-content: center;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+}
+
+.app--bridge-only .bridge-player--minimal .bridge-player__controls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
   gap: 10px;
 }
 
 .app--bridge-only .bridge-player--minimal .bridge-player__volume {
-  grid-column: 1 / -1;
-  grid-row: 3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
   width: 100%;
   max-width: none;
-  justify-content: center;
+  min-width: 0;
 }
 
 .app--bridge-only .bridge-player--minimal .bridge-player__volume input[type="range"] {
   flex: 1;
-  max-width: 200px;
+  min-width: 80px;
+  max-width: none;
+}
+
+.app--bridge-only .bridge-player--minimal .bridge-player__vol-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
 }
 
 .app--bridge-only .bridge-player--minimal .bridge-player__actions {
   grid-column: 1 / -1;
-  grid-row: 4;
+  grid-row: 3;
   margin-left: 0;
   justify-content: space-between;
   width: 100%;
+  gap: 8px;
 }
 
-.topbar__disclaimer {
-  display: block;
-  font-size: 9px;
-  font-weight: 600;
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: var(--text-subdued);
-  margin-top: 2px;
-  line-height: 1.2;
+.app--bridge-only .bridge-player--minimal .bridge-player__seek {
+  padding: 8px 0 4px;
+}
+
+/* Wider player bar: controls + volume on one row */
+@media (min-width: 400px) {
+  .app--bridge-only .bridge-player--minimal .bridge-player__transport {
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .app--bridge-only .bridge-player--minimal .bridge-player__volume {
+    flex: 1;
+    max-width: 220px;
+  }
+}
+
+/* Full-width mobile / tablet portrait (no art panel) */
+@media (max-width: 768px) {
+  .app--bridge-only .bridge-player--minimal .bridge-player__volume {
+    max-width: none;
+  }
+
+  .app--bridge-only .now-playing {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+}
+
+/* Tablet landscape + desktop narrow column */
+@media (min-width: 769px) and (max-width: 1100px) {
+  .app--bridge-only.app--has-player .bridge-player--minimal .bridge-player__transport {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .app--bridge-only.app--has-player .bridge-player--minimal .bridge-player__volume {
+    max-width: 100%;
+  }
 }
 
 .auth-modal__brand {
@@ -889,7 +942,7 @@
   }
 
   .app--bridge-only.app--has-player .bridge-player__row {
-    gap: 8px 10px;
+    gap: 10px 12px;
   }
 
   .app--bridge-only.app--has-player .bridge-player__volume {
@@ -955,31 +1008,12 @@
     justify-content: center;
   }
 
-  .bridge-player--minimal .bridge-player__row {
-    gap: 8px 10px;
+  .bridge-player--minimal .bridge-player__transport {
+    align-items: flex-start;
   }
 
   .bridge-player--minimal .bridge-player__controls {
-    justify-content: center;
-  }
-
-  .bridge-player--minimal .bridge-player__volume {
-    grid-column: 1 / -1;
-    width: 100%;
-    max-width: none;
-  }
-
-  .bridge-player--minimal .bridge-player__volume input[type="range"] {
-    flex: 1;
-    width: auto;
-    max-width: none;
-  }
-
-  .bridge-player--minimal .bridge-player__actions {
-    grid-column: 1 / -1;
-    margin-left: 0;
-    justify-content: space-between;
-    width: 100%;
+    justify-content: flex-start;
   }
 
   .chip--ellipsize {
