@@ -33,19 +33,18 @@
     const key = track.track_id || `${track.name}|${track.artist}`;
     if (previewCache.has(key)) return previewCache.get(key);
 
-    const q = encodeURIComponent(`${track.artist || ""} ${track.name || ""}`.trim());
-    if (!q) return null;
+    const params = new URLSearchParams();
+    if (track.track_id) params.set("track_id", track.track_id);
+    if (track.name) params.set("name", track.name);
+    if (track.artist) params.set("artist", track.artist);
+    if (!params.toString()) return null;
 
     try {
-      const r = await fetch(`https://api.deezer.com/search/track?q=${q}&limit=5`);
+      const r = await fetch(`/api/preview?${params}`);
+      if (!r.ok) return null;
       const data = await r.json();
-      const items = data.data || [];
-      const norm = s => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
-      const want = norm(track.name);
-      let hit = items.find(t => norm(t.title).includes(want) || want.includes(norm(t.title)));
-      if (!hit) hit = items[0];
-      const url = hit?.preview || null;
-      previewCache.set(key, url);
+      const url = data.preview_url || null;
+      if (url) previewCache.set(key, url);
       return url;
     } catch {
       return null;

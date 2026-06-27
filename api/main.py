@@ -27,6 +27,7 @@ from mvp.parse import parse_track_id, resolve_track_query
 from mvp.persistence import ensure_schema, log_bridge_event, metrics_summary
 from mvp.rate_limit import enforce_rate_limit
 from mvp.track_lookup import enrich_track_meta, lookup_track
+from mvp.preview_lookup import lookup_preview_url
 from mvp.session import (
     COOKIE_OAUTH,
     COOKIE_SESSION,
@@ -284,6 +285,28 @@ def api_track_lookup_post(
     if not track:
         raise HTTPException(404, "Track not found on Spotify — check the link")
     return track
+
+
+@app.get("/api/preview")
+def api_preview(
+    name: str = "",
+    artist: str = "",
+    track_id: str = "",
+) -> dict:
+    """~30s audio preview URL for in-browser playback (iTunes Search)."""
+    track_name = name.strip()
+    track_artist = artist.strip()
+    if track_id and not track_name:
+        meta = lookup_track(track_id.strip())
+        if meta:
+            track_name = meta.get("name", "")
+            track_artist = meta.get("artist", "")
+    if not track_name:
+        raise HTTPException(400, "Provide track name or track_id")
+    preview = lookup_preview_url(track_name, track_artist)
+    if not preview:
+        raise HTTPException(404, "No preview clip found for this track")
+    return {"preview_url": preview}
 
 
 @app.get("/api/search/tracks")
