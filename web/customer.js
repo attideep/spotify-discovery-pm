@@ -57,12 +57,6 @@
         signedIn.classList.add("hidden");
         if (saveBtn) saveBtn.classList.add("hidden");
       }
-
-      const googleBtn = $("authGoogleBtn");
-      if (googleBtn) {
-        googleBtn.disabled = !status.google_configured;
-        googleBtn.title = status.google_configured ? "" : "Google sign-in coming soon — use email for now";
-      }
     },
 
     openAuth(mode = "login") {
@@ -238,9 +232,6 @@
       $("authSignupBtn")?.addEventListener("click", () => this.openAuth("signup"));
       $("authSubmitBtn")?.addEventListener("click", () => this.submitAuth());
       $("authLogoutBtn")?.addEventListener("click", () => this.logout());
-      $("authGoogleBtn")?.addEventListener("click", () => {
-        window.location.href = "/api/auth/google";
-      });
       $("saveBridgeBtn")?.addEventListener("click", () => this.saveCurrentBridge());
       document.querySelectorAll("[data-close-auth]").forEach(btn => {
         btn.addEventListener("click", () => this.closeAuth());
