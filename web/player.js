@@ -1,7 +1,8 @@
-/** Bridge player — HTML5 preview + Web Audio (volume + bass/mid/treble EQ). */
+/** Bridge player — HTML5 preview + Web Audio (volume; optional EQ). */
 (function () {
   const STORAGE_VOL = "bridge_player_volume";
   const STORAGE_EQ = "bridge_player_eq";
+  const minimal = () => Boolean(window.PLAYER_MINIMAL);
   const previewCache = new Map();
 
   let audio = null;
@@ -16,6 +17,15 @@
   let isPlaying = false;
   let loadGen = 0;
   let tourTimer = null;
+  let seekDragging = false;
+  let progressTimer = null;
+
+  function fmtTime(sec) {
+    if (!Number.isFinite(sec) || sec < 0) return "0:00";
+    const m = Math.floor(sec / 60);
+    const s = Math.floor(sec % 60);
+    return `${m}:${s.toString().padStart(2, "0")}`;
+  }
 
   function readEq() {
     try {
@@ -55,8 +65,10 @@
     init() {
       this._bindControls();
       this._loadVolume();
-      this._loadEqSliders();
-      this._initEqCanvas();
+      if (!minimal()) {
+        this._loadEqSliders();
+        this._initEqCanvas();
+      }
     },
 
     _bindControls() {
@@ -67,8 +79,24 @@
         this._setVolumeLabel(v);
         if (gain) gain.gain.value = v;
       });
-      ["eqBass", "eqMid", "eqTreble"].forEach(id => {
-        document.getElementById(id)?.addEventListener("input", () => this._applyEqFromSliders());
+      if (!minimal()) {
+        ["eqBass", "eqMid", "eqTreble"].forEach(id => {
+          document.getElementById(id)?.addEventListener("input", () => this._applyEqFromSliders());
+        });
+      }
+      const seek = document.getElementById("playerSeek");
+      seek?.addEventListener("input", () => {
+        seekDragging = true;
+        if (!audio) return;
+        const pct = parseInt(seek.value, 10) / 1000;
+        const t = pct * (audio.duration || 30);
+        document.getElementById("playerTimeCurrent").textContent = fmtTime(t);
+      });
+      seek?.addEventListener("change", () => {
+        if (!audio) return;
+        const pct = parseInt(seek.value, 10) / 1000;
+        audio.currentTime = pct * (audio.duration || 30);
+        seekDragging = false;
       });
       document.getElementById("playerMenuBtn")?.addEventListener("click", () => {
         document.getElementById("playerMenu")?.classList.toggle("hidden");
@@ -123,29 +151,63 @@
     async _ensureContext() {
       if (!ctx) {
         ctx = new AudioContext();
-        bass = ctx.createBiquadFilter();
-        bass.type = "lowshelf";
-        bass.frequency.value = 150;
-        mid = ctx.createBiquadFilter();
-        mid.type = "peaking";
-        mid.frequency.value = 1000;
-        mid.Q.value = 0.9;
-        treble = ctx.createBiquadFilter();
-        treble.type = "highshelf";
-        treble.frequency.value = 4500;
         gain = ctx.createGain();
-        analyser = ctx.createAnalyser();
-        analyser.fftSize = 64;
-        bass.connect(mid);
-        mid.connect(treble);
-        treble.connect(gain);
-        gain.connect(analyser);
-        analyser.connect(ctx.destination);
-        this._applyEqFromSliders();
+        if (!minimal()) {
+          bass = ctx.createBiquadFilter();
+          bass.type = "lowshelf";
+          bass.frequency.value = 150;
+          mid = ctx.createBiquadFilter();
+          mid.type = "peaking";
+          mid.frequency.value = 1000;
+          mid.Q.value = 0.9;
+          treble = ctx.createBiquadFilter();
+          treble.type = "highshelf";
+          treble.frequency.value = 4500;
+          analyser = ctx.createAnalyser();
+          analyser.fftSize = 64;
+          bass.connect(mid);
+          mid.connect(treble);
+          treble.connect(gain);
+          gain.connect(analyser);
+          analyser.connect(ctx.destination);
+          this._applyEqFromSliders();
+        }
       }
       if (ctx.state === "suspended") await ctx.resume();
       const v = parseFloat(localStorage.getItem(STORAGE_VOL) || "0.85");
       gain.gain.value = v;
+    },
+
+    _connectSource() {
+      if (!source || !gain) return;
+      if (minimal()) {
+        source.connect(gain);
+        gain.connect(ctx.destination);
+      } else {
+        source.connect(bass);
+      }
+    },
+
+    _startProgress() {
+      clearInterval(progressTimer);
+      progressTimer = setInterval(() => this._updateProgress(), 250);
+    },
+
+    _stopProgress() {
+      clearInterval(progressTimer);
+      progressTimer = null;
+    },
+
+    _updateProgress() {
+      if (!audio || seekDragging) return;
+      const dur = audio.duration || 30;
+      const cur = audio.currentTime || 0;
+      const seek = document.getElementById("playerSeek");
+      const curEl = document.getElementById("playerTimeCurrent");
+      const durEl = document.getElementById("playerTimeDur");
+      if (seek) seek.value = String(Math.round((cur / dur) * 1000));
+      if (curEl) curEl.textContent = fmtTime(cur);
+      if (durEl) durEl.textContent = fmtTime(dur);
     },
 
     _clearPlayback() {
@@ -162,6 +224,7 @@
       isPlaying = false;
       this._syncPlayBtn();
       this._stopEq();
+      this._stopProgress();
     },
 
     async stop() {
@@ -174,14 +237,10 @@
       const gen = ++loadGen;
       this._clearPlayback();
 
-      const badge = document.getElementById("playerBadge");
-      if (badge) badge.textContent = "Loading preview…";
-
       const previewUrl = await fetchPreviewUrl(track);
       if (gen !== loadGen) return;
 
       if (!previewUrl) {
-        if (badge) badge.textContent = "No preview — tap Full song for Spotify";
         window.toast?.("No preview clip found — open in Spotify for full track");
         return;
       }
@@ -208,19 +267,20 @@
         audio.addEventListener("canplay", done);
         audio.addEventListener("error", err);
       }).catch(() => {
-        if (badge) badge.textContent = "Preview unavailable";
+        window.toast?.("Preview unavailable");
         return;
       });
 
       if (gen !== loadGen || !audio) return;
 
       source = ctx.createMediaElementSource(audio);
-      source.connect(bass);
+      this._connectSource();
 
       audio.addEventListener("ended", () => {
         isPlaying = false;
         this._syncPlayBtn();
         this._stopEq();
+        this._stopProgress();
       });
 
       const vol = parseFloat(localStorage.getItem(STORAGE_VOL) || "0.85");
@@ -228,14 +288,12 @@
         try {
           await audio.play();
           isPlaying = true;
-          if (badge) badge.textContent = "30s preview · Full song in Spotify";
           this._syncPlayBtn();
-          this._startEq();
+          if (minimal()) this._startProgress();
+          else this._startEq();
         } catch {
-          if (badge) badge.textContent = "Tap play to start preview";
+          window.toast?.("Tap play to start preview");
         }
-      } else if (badge) {
-        badge.textContent = "Unmuted — tap play";
       }
     },
 
@@ -248,7 +306,8 @@
       await audio.play();
       isPlaying = true;
       this._syncPlayBtn();
-      this._startEq();
+      if (minimal()) this._startProgress();
+      else this._startEq();
     },
 
     async pause() {
@@ -256,6 +315,7 @@
       isPlaying = false;
       this._syncPlayBtn();
       this._stopEq();
+      this._stopProgress();
     },
 
     togglePlay() {

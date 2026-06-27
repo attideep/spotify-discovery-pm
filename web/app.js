@@ -180,6 +180,7 @@ async function tryLoadSharedBridge(shareParams) {
 
 function displaySession(session) {
   lastSession = session;
+  window.lastSession = session;
   const sessionBlock = document.getElementById("sessionBlock");
   sessionBlock.classList.remove("hidden");
   sessionBlock.classList.remove("session-block");
@@ -187,7 +188,7 @@ function displaySession(session) {
   sessionBlock.classList.add("session-block");
   document.getElementById("sessionTitle").textContent = `Bridge from ${session.anchor_track}`;
   document.getElementById("sessionSummary").textContent = session.session_summary;
-  document.getElementById("sessionMode").textContent = "Free";
+  document.getElementById("sessionMode").textContent = BRIDGE_ONLY ? "" : "Free";
   const plannerEl = document.getElementById("sessionPlanner");
   const plannerLabel = PLANNER_LABELS[session.planner] || "";
   if (plannerEl) {
@@ -206,6 +207,8 @@ function displaySession(session) {
   window.BridgeExtras?.renderStats(session);
   window.BridgeExtras?.saveHistory(session);
 }
+
+window.displaySession = displaySession;
 
 async function fetchJSON(path, opts = {}) {
   const r = await fetch(`${API}${path}`, { ...FETCH_OPTS, ...opts });
@@ -452,6 +455,7 @@ async function searchAnchorTracks(q) {
     if (q && looksLikeSpotifyRef(q)) previewAnchor();
     return;
   }
+  if (BRIDGE_ONLY) window.CustomerApp?.showSearchLoading(el, "Searching songs…");
   try {
     const data = await fetchJSON(`/api/search/tracks?q=${encodeURIComponent(q)}`);
     el.innerHTML = renderSearchResultsHtml(data.tracks || [], "");
@@ -769,6 +773,10 @@ function renderSearchResults(data) {
 }
 
 async function searchTracks(q) {
+  if (BRIDGE_ONLY) {
+    const el = document.getElementById("searchResults");
+    window.CustomerApp?.showSearchLoading(el, "Searching catalog…");
+  }
   const data = await fetchJSON(`/api/search/tracks?q=${encodeURIComponent(q)}`);
   renderSearchResults(data);
 }
@@ -903,7 +911,7 @@ function renderTracks(tracks, { animate = false } = {}) {
   currentTracks = tracks;
   const container = document.getElementById("tracks");
   container.innerHTML = tracks.map((t, i) => `
-    <div class="track-row${animate ? " track-row--reveal" : ""}${i === 0 ? " track-row--active" : ""}" data-idx="${i}" role="button" tabindex="0" style="${animate ? `animation-delay:${i * 0.07}s` : ""}">
+    <div class="track-row${animate ? " track-row--reveal" : ""}${i === 0 ? " track-row--active" : ""}${BRIDGE_ONLY ? " track-row--customer" : ""}" data-idx="${i}" role="button" tabindex="0" style="${animate ? `animation-delay:${i * 0.07}s` : ""}">
       <span class="track-row__idx">${t.position}</span>
       <span class="track-row__play-sm">▶</span>
       <div class="track-row__main">
@@ -917,10 +925,9 @@ function renderTracks(tracks, { animate = false } = {}) {
         ${Math.round(t.novelty_score * 100)}%
         <span class="track-row__novelty-bar"><span class="track-row__novelty-fill" style="width:${Math.round(t.novelty_score * 100)}%"></span></span>
       </span>
-      <span></span>
-      <a class="track-row__link" href="${t.spotify_url}" target="_blank" rel="noopener" aria-label="Open in Spotify">
+      ${BRIDGE_ONLY ? "" : `<a class="track-row__link" href="${t.spotify_url}" target="_blank" rel="noopener" aria-label="Open in Spotify">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg>
-      </a>
+      </a>`}
     </div>
     <p class="track-row__bridge-note">${escapeHtml(t.explanation)}</p>
   `).join("");
@@ -1040,6 +1047,7 @@ async function boot() {
   window.previewAnchor = previewAnchor;
   window.EXAMPLE_ANCHORS = EXAMPLE_ANCHORS;
   window.CONTEXT_INTENTS = CONTEXT_INTENTS;
+  window.displaySession = displaySession;
   window.BridgePlayer?.init();
   window.BridgeExtras?.bindShortcuts();
   initExampleChips();

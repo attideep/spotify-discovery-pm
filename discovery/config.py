@@ -16,6 +16,8 @@ class Settings(BaseSettings):
     spotify_client_secret: str = ""
     spotify_redirect_uri: str = "https://spotify-discovery-pm.vercel.app/mvp/callback"
     session_secret: str = "change-me-in-production"
+    google_client_id: str = ""
+    google_client_secret: str = ""
     api_base_url: str = "https://spotify-discovery-pm.vercel.app"
     web_base_url: str = "https://spotify-discovery-pm.vercel.app"
     data_dir: str = "data"

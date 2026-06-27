@@ -10,6 +10,7 @@ from discovery.config import get_settings
 
 COOKIE_SESSION = "bridge_session"
 COOKIE_OAUTH = "bridge_oauth"
+COOKIE_APP_USER = "app_user"
 MAX_AGE = 60 * 60 * 24 * 7  # 7 days
 OAUTH_MAX_AGE = 600  # 10 min
 
@@ -20,6 +21,36 @@ def _ser() -> URLSafeTimedSerializer:
 
 def _oauth_ser() -> URLSafeTimedSerializer:
     return URLSafeTimedSerializer(get_settings().session_secret, salt="oauth-v1")
+
+
+def _app_user_ser() -> URLSafeTimedSerializer:
+    return URLSafeTimedSerializer(get_settings().session_secret, salt="app-user-v1")
+
+
+def pack_app_user(user_id: str, email: str, display_name: str = "") -> str:
+    return _app_user_ser().dumps({"user_id": user_id, "email": email, "display_name": display_name})
+
+
+def unpack_app_user(cookie: str | None) -> dict[str, Any] | None:
+    if not cookie:
+        return None
+    try:
+        return _app_user_ser().loads(cookie, max_age=MAX_AGE)
+    except BadSignature:
+        return None
+
+
+def app_user_cookie_kwargs(token: str) -> dict:
+    secure = get_settings().api_base_url.startswith("https")
+    return {
+        "key": COOKIE_APP_USER,
+        "value": token,
+        "httponly": True,
+        "secure": secure,
+        "samesite": "lax",
+        "max_age": MAX_AGE,
+        "path": "/",
+    }
 
 
 def pack_session(access_token: str, refresh_token: str = "", expires_at: float = 0) -> str:

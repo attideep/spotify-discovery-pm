@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import secrets
+import urllib.parse
 from pathlib import Path
 
 from fastapi import Cookie, FastAPI, HTTPException, Request, Response
@@ -29,12 +31,26 @@ from mvp.rate_limit import enforce_rate_limit
 from mvp.track_lookup import enrich_track_meta, lookup_track
 from mvp.preview_lookup import lookup_preview_url
 from mvp.session import (
+    COOKIE_APP_USER,
     COOKIE_OAUTH,
     COOKIE_SESSION,
+    app_user_cookie_kwargs,
     clear_cookie,
     oauth_cookie_kwargs,
+    pack_app_user,
     session_cookie_kwargs,
+    unpack_app_user,
 )
+from mvp.user_auth import (
+    build_google_auth_url,
+    exchange_google_code,
+    google_oauth_configured,
+    login_user,
+    public_auth_status,
+    register_user,
+    user_from_id,
+)
+from mvp.user_store import delete_saved_bridge, ensure_user_schema, get_saved_bridge, list_saved_bridges, save_bridge
 from mvp.spotify_client import SpotifyAPIError, SpotifyClient, normalize_track
 
 app = FastAPI(
@@ -76,6 +92,17 @@ class RestoreBridgeBody(BaseModel):
     track_ids: list[str]
 
 
+class SignupBody(BaseModel):
+    email: str
+    password: str
+    display_name: str = ""
+
+
+class LoginBody(BaseModel):
+    email: str
+    password: str
+
+
 def _ensure_indexed() -> ReviewStore:
     store = ReviewStore()
     if store.count() == 0:
@@ -108,6 +135,14 @@ def _spotify_error(exc: SpotifyAPIError) -> JSONResponse:
 def startup() -> None:
     _ensure_indexed()
     ensure_schema()
+    ensure_user_schema()
+
+
+def _current_app_user(app_user: str | None = Cookie(default=None, alias=COOKIE_APP_USER)) -> dict | None:
+    packed = unpack_app_user(app_user)
+    if not packed:
+        return None
+    return user_from_id(packed.get("user_id"))
 
 
 @app.get("/health")
@@ -124,6 +159,8 @@ def health() -> dict:
         "allow_demo_mode": settings.allow_demo_mode,
         "persistence_enabled": settings.persistence_enabled,
         "rate_limit_per_minute": settings.rate_limit_per_minute,
+        "google_auth_configured": google_oauth_configured(),
+        "user_auth_ready": ensure_user_schema(),
     }
 
 
@@ -252,6 +289,117 @@ def mvp_demo_token() -> dict:
     if not settings.allow_demo_mode:
         raise HTTPException(403, "Demo mode disabled")
     return {"demo_mode": True}
+
+
+# --- Customer app user auth ---
+
+@app.get("/api/auth/user/status")
+def app_user_status(app_user: str | None = Cookie(default=None, alias=COOKIE_APP_USER)) -> dict:
+    return public_auth_status(_current_app_user(app_user))
+
+
+@app.post("/api/auth/signup")
+def app_signup(body: SignupBody, request: Request) -> JSONResponse:
+    enforce_rate_limit(request, scope="auth")
+    user, err = register_user(body.email, body.password, body.display_name)
+    if err:
+        raise HTTPException(400, err)
+    resp = JSONResponse(public_auth_status(user))
+    resp.set_cookie(**app_user_cookie_kwargs(pack_app_user(user["id"], user["email"], user.get("display_name", ""))))
+    return resp
+
+
+@app.post("/api/auth/login")
+def app_login(body: LoginBody, request: Request) -> JSONResponse:
+    enforce_rate_limit(request, scope="auth")
+    user, err = login_user(body.email, body.password)
+    if err:
+        raise HTTPException(401, err)
+    resp = JSONResponse(public_auth_status(user))
+    resp.set_cookie(**app_user_cookie_kwargs(pack_app_user(user["id"], user["email"], user.get("display_name", ""))))
+    return resp
+
+
+@app.post("/api/auth/logout")
+def app_logout() -> JSONResponse:
+    resp = JSONResponse({"ok": True, "logged_in": False})
+    resp.set_cookie(**clear_cookie(COOKIE_APP_USER))
+    return resp
+
+
+@app.get("/api/auth/google")
+def app_google_login(response: Response) -> RedirectResponse:
+    if not google_oauth_configured():
+        raise HTTPException(503, "Google sign-in is not configured yet.")
+    state = secrets.token_urlsafe(24)
+    from mvp.session import pack_oauth
+
+    resp = RedirectResponse(build_google_auth_url(state))
+    resp.set_cookie(**oauth_cookie_kwargs(pack_oauth(state, "google-app")))
+    return resp
+
+
+@app.get("/api/auth/google/callback")
+def app_google_callback(
+    code: str,
+    state: str = "",
+    bridge_oauth: str | None = Cookie(default=None, alias=COOKIE_OAUTH),
+) -> RedirectResponse:
+    from mvp.session import unpack_oauth
+
+    oauth = unpack_oauth(bridge_oauth)
+    if not oauth or oauth.get("state") != state:
+        return RedirectResponse("/app?auth_error=state_mismatch")
+    user, err = exchange_google_code(code)
+    if err or not user:
+        return RedirectResponse(f"/app?auth_error={urllib.parse.quote(err or 'login_failed')}")
+    resp = RedirectResponse("/app")
+    resp.set_cookie(**app_user_cookie_kwargs(pack_app_user(user["id"], user["email"], user.get("display_name", ""))))
+    resp.set_cookie(**clear_cookie(COOKIE_OAUTH))
+    return resp
+
+
+@app.get("/api/bridges/saved")
+def api_list_saved(app_user: str | None = Cookie(default=None, alias=COOKIE_APP_USER)) -> dict:
+    user = _current_app_user(app_user)
+    if not user:
+        raise HTTPException(401, "Sign in to view saved bridges.")
+    return {"bridges": list_saved_bridges(user["id"])}
+
+
+@app.post("/api/bridges/save")
+def api_save_bridge(
+    body: dict,
+    app_user: str | None = Cookie(default=None, alias=COOKIE_APP_USER),
+) -> dict:
+    user = _current_app_user(app_user)
+    if not user:
+        raise HTTPException(401, "Sign in to save bridges.")
+    saved = save_bridge(user["id"], body)
+    if not saved:
+        raise HTTPException(500, "Could not save bridge.")
+    return saved
+
+
+@app.get("/api/bridges/saved/{bridge_id}")
+def api_get_saved(bridge_id: str, app_user: str | None = Cookie(default=None, alias=COOKIE_APP_USER)) -> dict:
+    user = _current_app_user(app_user)
+    if not user:
+        raise HTTPException(401, "Sign in to open saved bridges.")
+    bridge = get_saved_bridge(user["id"], bridge_id)
+    if not bridge:
+        raise HTTPException(404, "Saved bridge not found.")
+    return bridge
+
+
+@app.delete("/api/bridges/saved/{bridge_id}")
+def api_delete_saved(bridge_id: str, app_user: str | None = Cookie(default=None, alias=COOKIE_APP_USER)) -> dict:
+    user = _current_app_user(app_user)
+    if not user:
+        raise HTTPException(401, "Sign in to manage saved bridges.")
+    if not delete_saved_bridge(user["id"], bridge_id):
+        raise HTTPException(404, "Saved bridge not found.")
+    return {"ok": True}
 
 
 # --- Bridge ---
