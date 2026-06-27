@@ -12,11 +12,92 @@
   ];
 
   const LOCAL_LIB_KEY = "bridge_local_library_v1";
+  const LOCAL_AUTH_KEY = "bridge_local_account_v1";
   const LOCAL_ID_PREFIX = "local:";
 
   let authUser = null;
   let sessionSaved = false;
   let storageMode = "sqlite-ephemeral";
+
+  function normalizeEmail(email) {
+    return String(email || "").trim().toLowerCase();
+  }
+
+  async function hashCredentials(email, password) {
+    const data = new TextEncoder().encode(`${normalizeEmail(email)}\0${password}`);
+    const buf = await crypto.subtle.digest("SHA-256", data);
+    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, "0")).join("");
+  }
+
+  function getLocalAuth() {
+    try {
+      const raw = localStorage.getItem(LOCAL_AUTH_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function saveLocalAuth(user, passwordHash) {
+    try {
+      localStorage.setItem(LOCAL_AUTH_KEY, JSON.stringify({
+        id: user.id,
+        email: user.email,
+        display_name: user.display_name || user.email?.split("@")[0] || "you",
+        pwHash: passwordHash,
+        active: true,
+        updated_at: new Date().toISOString(),
+      }));
+    } catch { /* ignore */ }
+  }
+
+  function setLocalAuthActive(active) {
+    const acc = getLocalAuth();
+    if (!acc) return;
+    acc.active = active;
+    try {
+      localStorage.setItem(LOCAL_AUTH_KEY, JSON.stringify(acc));
+    } catch { /* ignore */ }
+  }
+
+  function localUserFromAuth(acc) {
+    if (!acc) return null;
+    return {
+      id: acc.id,
+      email: acc.email,
+      display_name: acc.display_name,
+      _localAuth: true,
+    };
+  }
+
+  async function verifyLocalPassword(email, password) {
+    const acc = getLocalAuth();
+    if (!acc || normalizeEmail(acc.email) !== normalizeEmail(email)) return false;
+    const hash = await hashCredentials(email, password);
+    return hash === acc.pwHash;
+  }
+
+  async function createLocalAccount(email, password, display_name) {
+    const norm = normalizeEmail(email);
+    const existing = getLocalAuth();
+    if (existing && normalizeEmail(existing.email) === norm) {
+      const pwHash = await hashCredentials(email, password);
+      saveLocalAuth({
+        id: existing.id,
+        email: norm,
+        display_name: display_name.trim() || existing.display_name || norm.split("@")[0],
+      }, pwHash);
+      return localUserFromAuth(getLocalAuth());
+    }
+    const pwHash = await hashCredentials(email, password);
+    const user = {
+      id: `${LOCAL_ID_PREFIX}${crypto.randomUUID()}`,
+      email: norm,
+      display_name: display_name.trim() || norm.split("@")[0],
+    };
+    saveLocalAuth(user, pwHash);
+    return user;
+  }
 
   function $(id) {
     return document.getElementById(id);
@@ -141,12 +222,17 @@
     async refreshAuth() {
       try {
         const data = await fetch("/api/auth/user/status", { credentials: "include" }).then(r => r.json());
-        if (data.session_lost) {
-          window.toast?.("Please sign in again — your library is still saved in this browser.");
-        }
         storageMode = data.storage || storageMode;
-        authUser = data.user || null;
-        this._renderAuthUI(data);
+        if (data.session_lost) {
+          window.toast?.("Server session expired — using your account on this device.");
+        }
+        if (data.logged_in && data.user) {
+          authUser = data.user;
+        } else {
+          const local = getLocalAuth();
+          authUser = local?.active ? localUserFromAuth(local) : null;
+        }
+        this._renderAuthUI({ logged_in: Boolean(authUser), user: authUser });
         renderStorageNote(storageMode);
         if (authUser) {
           await this.loadSavedBridges();
@@ -160,11 +246,13 @@
         this.renderContinueCard();
         return data;
       } catch {
-        authUser = null;
-        this._renderAuthUI({ logged_in: false, user: null });
+        const local = getLocalAuth();
+        authUser = local?.active ? localUserFromAuth(local) : null;
+        this._renderAuthUI({ logged_in: Boolean(authUser), user: authUser });
         this._renderLibraryHint();
         this._renderSessionLostBanner({});
         this.renderContinueCard();
+        if (authUser) await this.loadSavedBridges();
       }
     },
 
@@ -278,6 +366,24 @@
         }
         return;
       }
+      if (mode === "signup" && password.length < 8) {
+        if (errEl) {
+          errEl.textContent = "Password must be at least 8 characters.";
+          errEl.classList.remove("hidden");
+        }
+        return;
+      }
+
+      const finishAuth = async (user, message) => {
+        authUser = { ...user, _localAuth: storageMode !== "postgres" };
+        setLocalAuthActive(true);
+        this.closeAuth();
+        $("authPassword").value = "";
+        await this.refreshAuth();
+        window.toast?.(message);
+        if (authUser) setTimeout(() => this.scrollToLibrary(), 400);
+      };
+
       const path = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
       try {
         const r = await fetch(path, {
@@ -291,19 +397,69 @@
         try {
           data = raw ? JSON.parse(raw) : {};
         } catch {
-          const snippet = raw.replace(/\s+/g, " ").trim().slice(0, 80);
-          throw new Error(
-            r.ok
-              ? "Unexpected server response."
-              : snippet || `Sign-in failed (${r.status}). Please try again.`
-          );
+          throw new Error("Unexpected server response. Trying this device…");
         }
-        if (!r.ok) throw new Error(data.detail || data.error || "Auth failed");
-        this.closeAuth();
-        await this.refreshAuth();
-        window.toast?.(mode === "signup" ? "Welcome! Your library is ready." : "Signed in — your library is below.");
-        if (authUser) setTimeout(() => this.scrollToLibrary(), 400);
+
+        if (r.ok && data.user) {
+          const pwHash = await hashCredentials(email, password);
+          saveLocalAuth(data.user, pwHash);
+          await finishAuth(
+            data.user,
+            mode === "signup" ? "Welcome! Your library is ready." : "Signed in — your library is below."
+          );
+          return;
+        }
+
+        const serverErr = data.detail || data.error || "";
+        if (mode === "login" && (r.status === 401 || r.status === 400)) {
+          if (await verifyLocalPassword(email, password)) {
+            const local = getLocalAuth();
+            await finishAuth(localUserFromAuth(local), "Signed in on this device.");
+            return;
+          }
+        }
+
+        if (mode === "signup" && serverErr.includes("already exists")) {
+          if (await verifyLocalPassword(email, password)) {
+            const local = getLocalAuth();
+            await finishAuth(localUserFromAuth(local), "Welcome back — signed in on this device.");
+            return;
+          }
+          throw new Error("Account exists on this device — try signing in with the same password.");
+        }
+
+        if (storageMode !== "postgres") {
+          if (mode === "signup") {
+            const user = await createLocalAccount(email, password, display_name);
+            await finishAuth(user, "Account created on this device. Your library stays in this browser.");
+            return;
+          }
+          if (mode === "login" && await verifyLocalPassword(email, password)) {
+            const local = getLocalAuth();
+            await finishAuth(localUserFromAuth(local), "Signed in on this device.");
+            return;
+          }
+        }
+
+        throw new Error(
+          serverErr ||
+          (mode === "login"
+            ? "Invalid email or password. If you signed up earlier, the server may have reset — try signing up again on this device."
+            : "Could not create account. Please try again.")
+        );
       } catch (e) {
+        if (storageMode !== "postgres" && mode === "login" && await verifyLocalPassword(email, password)) {
+          const local = getLocalAuth();
+          await finishAuth(localUserFromAuth(local), "Signed in on this device.");
+          return;
+        }
+        if (storageMode !== "postgres" && mode === "signup") {
+          try {
+            const user = await createLocalAccount(email, password, display_name);
+            await finishAuth(user, "Account saved on this device.");
+            return;
+          } catch { /* fall through */ }
+        }
         if (errEl) {
           errEl.textContent = e.message;
           errEl.classList.remove("hidden");
@@ -312,7 +468,8 @@
     },
 
     async logout() {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
+      setLocalAuthActive(false);
       authUser = null;
       sessionSaved = false;
       await this.refreshAuth();
@@ -339,7 +496,17 @@
         } catch {
           throw new Error("Could not save bridge — try again.");
         }
-        if (!r.ok) throw new Error(data.detail || data.error || "Save failed");
+        if (!r.ok) {
+          if (storageMode !== "postgres" && authUser) {
+            mirrorBridgeLocal(window.lastSession);
+            this.markSessionSaved();
+            window.toast?.("Saved on this device");
+            await this.loadSavedBridges();
+            setTimeout(() => this.scrollToLibrary(), 300);
+            return;
+          }
+          throw new Error(data.detail || data.error || "Save failed");
+        }
         mirrorBridgeLocal(window.lastSession, data.id);
         this.markSessionSaved();
         window.toast?.("Saved to your library");
