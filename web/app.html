@@ -74,12 +74,21 @@
             <div id="savedBridges" class="saved-bridges" aria-label="Saved bridges"></div>
           </section>
 
+          <div id="sessionLostBanner" class="session-lost-banner hidden" role="status">
+            <p class="session-lost-banner__text">You were signed out — this host resets accounts between visits until persistent storage is enabled. Sign in again to restore your library.</p>
+            <button type="button" class="btn-spotify btn-spotify--green btn-spotify--sm" id="sessionLostSignIn">Sign in</button>
+          </div>
+
           <div id="continueBridge" class="continue-bridge hidden">
-            <div>
-              <div class="continue-bridge__title" id="continueBridgeTitle">Continue your last bridge</div>
-              <div class="continue-bridge__sub">Pick up where you left off on this device</div>
+            <div class="continue-bridge__body">
+              <div class="continue-bridge__eyebrow">On this device only</div>
+              <div class="continue-bridge__title" id="continueBridgeTitle">Resume your last bridge</div>
+              <div class="continue-bridge__sub">Not saved to your account — sign in to sync across devices.</div>
             </div>
-            <button type="button" class="btn-spotify btn-spotify--green btn-spotify--sm" data-continue>Resume</button>
+            <div class="continue-bridge__actions">
+              <button type="button" class="btn-spotify btn-spotify--green btn-spotify--sm" data-continue>Resume</button>
+              <button type="button" class="continue-bridge__dismiss" data-dismiss-continue aria-label="Dismiss">×</button>
+            </div>
           </div>
 
           <div class="bridge-form">

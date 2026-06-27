@@ -43,15 +43,28 @@
     async refreshAuth() {
       try {
         const data = await fetch("/api/auth/user/status", { credentials: "include" }).then(r => r.json());
+        if (data.session_lost) {
+          window.toast?.("Your sign-in expired on this server — please sign in again.");
+        }
         authUser = data.user || null;
         this._renderAuthUI(data);
-        if (authUser) await this.loadSavedBridges();
-        else this._renderLibraryHint();
+        if (authUser) {
+          await this.loadSavedBridges();
+          try {
+            localStorage.setItem("bridge_last_email", authUser.email || "");
+          } catch { /* ignore */ }
+        } else {
+          this._renderLibraryHint();
+        }
+        this._renderSessionLostBanner(data);
+        this.renderContinueCard();
         return data;
       } catch {
         authUser = null;
         this._renderAuthUI({ logged_in: false, user: null });
         this._renderLibraryHint();
+        this._renderSessionLostBanner({});
+        this.renderContinueCard();
       }
     },
 
@@ -90,6 +103,13 @@
       hint.classList.remove("hidden");
     },
 
+    _renderSessionLostBanner(data) {
+      const banner = $("sessionLostBanner");
+      if (!banner) return;
+      const show = Boolean(data.session_lost) && !authUser;
+      banner.classList.toggle("hidden", !show);
+    },
+
     scrollToLibrary() {
       $("libraryPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
     },
@@ -123,6 +143,13 @@
       $("authSubmitBtn").dataset.mode = mode;
       $("authError")?.classList.add("hidden");
       $("authNameField")?.classList.toggle("hidden", mode !== "signup");
+      const emailEl = $("authEmail");
+      if (emailEl && !emailEl.value) {
+        try {
+          const last = localStorage.getItem("bridge_last_email");
+          if (last) emailEl.value = last;
+        } catch { /* ignore */ }
+      }
     },
 
     closeAuth() {
@@ -327,20 +354,36 @@
     },
 
     renderContinueCard() {
+      const el = $("continueBridge");
+      if (!el) return;
+      if (authUser) {
+        el.classList.add("hidden");
+        return;
+      }
       const raw = localStorage.getItem("bridge_last_session");
-      if (!raw) return;
+      if (!raw) {
+        el.classList.add("hidden");
+        return;
+      }
       try {
         const session = JSON.parse(raw);
-        const el = $("continueBridge");
-        if (!el || !session.tracks?.length) return;
+        if (!session.tracks?.length) {
+          el.classList.add("hidden");
+          return;
+        }
         el.classList.remove("hidden");
-        el.querySelector("[data-continue]")?.addEventListener("click", () => {
-          window.displaySession?.(session);
-          window.toast?.("Picked up where you left off");
-        });
         const title = $("continueBridgeTitle");
-        if (title) title.textContent = `Continue: ${session.anchor_track}`;
+        if (title) title.textContent = session.anchor_track || "Your last bridge";
+      } catch {
+        el.classList.add("hidden");
+      }
+    },
+
+    dismissContinueCard() {
+      try {
+        localStorage.removeItem("bridge_last_session");
       } catch { /* ignore */ }
+      $("continueBridge")?.classList.add("hidden");
     },
 
     persistLastSession(session) {
@@ -362,7 +405,18 @@
       $("authLoginBtn")?.addEventListener("click", () => this.openAuth("login"));
       $("authSignupBtn")?.addEventListener("click", () => this.openAuth("signup"));
       $("libraryHintSignIn")?.addEventListener("click", () => this.openAuth("login"));
+      $("sessionLostSignIn")?.addEventListener("click", () => this.openAuth("login"));
       $("libraryNavBtn")?.addEventListener("click", () => this.scrollToLibrary());
+      $("continueBridge")?.querySelector("[data-continue]")?.addEventListener("click", () => {
+        try {
+          const session = JSON.parse(localStorage.getItem("bridge_last_session") || "null");
+          if (session?.tracks?.length) {
+            window.displaySession?.(session);
+            window.toast?.("Resumed on this device");
+          }
+        } catch { /* ignore */ }
+      });
+      $("continueBridge")?.querySelector("[data-dismiss-continue]")?.addEventListener("click", () => this.dismissContinueCard());
       $("authSubmitBtn")?.addEventListener("click", () => this.submitAuth());
       $("authLogoutBtn")?.addEventListener("click", () => this.logout());
       $("saveBridgeBtn")?.addEventListener("click", () => this.saveCurrentBridge());
@@ -378,7 +432,6 @@
       }
 
       this.renderMoodChips();
-      this.renderContinueCard();
       this.refreshAuth();
 
       const origDisplay = window.displaySession;

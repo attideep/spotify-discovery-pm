@@ -294,8 +294,17 @@ def mvp_demo_token() -> dict:
 # --- Customer app user auth ---
 
 @app.get("/api/auth/user/status")
-def app_user_status(app_user: str | None = Cookie(default=None, alias=COOKIE_APP_USER)) -> dict:
-    return public_auth_status(_current_app_user(app_user))
+def app_user_status(app_user: str | None = Cookie(default=None, alias=COOKIE_APP_USER)) -> JSONResponse:
+    packed = unpack_app_user(app_user)
+    user = user_from_id(packed.get("user_id")) if packed else None
+    status = public_auth_status(user)
+    if packed and not user:
+        status["session_lost"] = True
+        status["session_lost_reason"] = "account_unavailable"
+    resp = JSONResponse(status)
+    if packed and not user:
+        resp.set_cookie(**clear_cookie(COOKIE_APP_USER))
+    return resp
 
 
 @app.post("/api/auth/signup")

@@ -965,12 +965,13 @@ function renderTracks(tracks, { animate = false } = {}) {
   const container = document.getElementById("tracks");
   if (!container) return;
   container.innerHTML = tracks.map((t, i) => `
+    <div class="track-entry${BRIDGE_ONLY ? " track-entry--customer" : ""}">
     <div class="track-row${animate ? " track-row--reveal" : ""}${i === 0 ? " track-row--active" : ""}${BRIDGE_ONLY ? " track-row--customer" : ""}" data-idx="${i}" role="button" tabindex="0" style="${animate ? `animation-delay:${i * 0.07}s` : ""}">
       <span class="track-row__idx">${t.position}</span>
       <span class="track-row__play-sm">▶</span>
       <div class="track-row__main">
         ${trackThumbHtml(t, i)}
-        <div>
+        <div class="track-row__text">
           <div class="track-row__title">${escapeHtml(t.name)}</div>
           <div class="track-row__artist">${escapeHtml(t.artist)}</div>
         </div>
@@ -984,6 +985,7 @@ function renderTracks(tracks, { animate = false } = {}) {
       </a>`}
     </div>
     <p class="track-row__bridge-note">${escapeHtml(t.explanation)}</p>
+    </div>
   `).join("");
 
   container.querySelectorAll(".track-row").forEach(row => {
