@@ -25,6 +25,7 @@
     @media (min-width:769px){.app{grid-template-columns:240px 1fr}}
   </style>
   <link rel="stylesheet" href="/static/styles.css" />
+  <link rel="stylesheet" href="/static/player.css" />
 </head>
 <body>
   <div class="app">
@@ -82,7 +83,7 @@
             <div class="public-banner__text">
               <p class="public-banner__eyebrow">Free · No login · Unlimited</p>
               <h2 class="public-banner__title">Discover music through gradual bridges — not random jumps</h2>
-              <p class="public-banner__desc">AI-planned 8-track journeys from a song you love toward something new. Search any track, explore listener insights, or ask what people really say about music discovery.</p>
+              <p class="public-banner__desc">AI-planned 8-track journeys from a song you love toward something new. Search <span id="catalogSizeLabel">50,000+</span> tracks, explore listener insights, or ask what people really say about music discovery.</p>
             </div>
             <button type="button" class="btn-spotify btn-spotify--green public-banner__cta" data-tab="bridge">Start a bridge session</button>
           </div>
@@ -179,6 +180,7 @@
             <div class="chip-row chip-row--compact" id="intentChips"></div>
             <div class="bridge-actions">
               <button id="buildBtn" class="btn-spotify btn-spotify--green">Generate bridge session</button>
+              <button type="button" id="surpriseBtn" class="btn-spotify btn-spotify--ghost">Surprise me</button>
               <button id="savePlaylistBtn" class="btn-spotify btn-spotify--ghost hidden">Save to Spotify</button>
             </div>
             <div id="bridgeLoader" class="bridge-loader hidden" aria-live="polite" aria-busy="false">
@@ -202,6 +204,7 @@
               </div>
             </div>
             <p id="sessionSummary" class="session-summary"></p>
+            <div id="bridgeStats" class="bridge-stats hidden" aria-label="Bridge session stats"></div>
             <div id="noveltyJourney" class="novelty-journey hidden" aria-label="Novelty arc from familiar to novel"></div>
             <div class="track-list-header">
               <span>#</span><span>Title</span><span>Novelty</span><span></span><span></span>
@@ -235,28 +238,89 @@
       </div>
     </div>
 
-    <!-- Preview bar — Spotify embed + quick open -->
+    <!-- Custom bridge player — Spotify preview via hidden embed; our controls & legal links -->
     <footer class="now-playing hidden" id="previewBar">
-      <div class="now-playing__embed" id="playerEmbed" aria-label="Spotify preview player"></div>
-      <div class="now-playing__compact">
-        <div class="now-playing__track">
-          <div class="now-playing__art" id="playerArt"></div>
-          <div class="now-playing__meta">
+      <div class="bridge-player">
+        <canvas id="eqCanvas" class="bridge-player__eq" aria-hidden="true"></canvas>
+        <div class="bridge-player__row">
+          <div class="now-playing__art bridge-player__art" id="playerArt"></div>
+          <div class="bridge-player__meta">
             <div class="now-playing__title" id="playerTitle">Tap a track to preview</div>
             <div class="now-playing__artist" id="playerArtist">Bridge Sessions</div>
+            <span class="bridge-player__badge" id="playerBadge">30s preview · Full song in Spotify</span>
+          </div>
+          <div class="bridge-player__controls">
+            <button type="button" class="bridge-player__play" id="playerPlayBtn" aria-label="Play or pause">▶</button>
+            <button type="button" class="bridge-player__nav" id="playerPrev" aria-label="Previous">‹</button>
+            <button type="button" class="bridge-player__nav" id="playerNext" aria-label="Next">›</button>
+          </div>
+          <div class="bridge-player__volume">
+            <label for="playerVolume" class="sr-only">Volume</label>
+            <span aria-hidden="true">🔊</span>
+            <input type="range" id="playerVolume" min="0" max="100" value="85" />
+            <span id="playerVolumeLabel" class="bridge-player__vol-label">85%</span>
+          </div>
+          <div class="bridge-player__actions">
+            <span class="now-playing__step" id="playerStep"></span>
+            <button type="button" class="chip chip--sm" id="playerTourBtn">Auto tour</button>
+            <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="playerOpen">Full song</button>
+            <button type="button" class="bridge-player__menu" id="playerMenuBtn" aria-label="Player menu">⋯</button>
           </div>
         </div>
-        <div class="now-playing__actions">
-          <span class="now-playing__step" id="playerStep"></span>
-          <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="playerPrev" aria-label="Previous track">‹</button>
-          <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="playerNext" aria-label="Next track">›</button>
-          <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="playerOpen">Open in Spotify</button>
+        <div id="playerMenu" class="bridge-player__menu-panel hidden">
+          <button type="button" data-legal="termsModal">Terms of use</button>
+          <button type="button" data-legal="privacyModal">Privacy</button>
+          <button type="button" data-legal="playbackModal">About playback</button>
+          <button type="button" data-legal="shortcutsModal">Keyboard shortcuts</button>
         </div>
       </div>
+      <div id="spotifyEmbedHost" class="spotify-embed-host" aria-hidden="true"></div>
     </footer>
   </div>
 
+  <div id="termsModal" class="modal hidden" role="dialog" aria-labelledby="termsTitle">
+    <div class="modal__card">
+      <h2 id="termsTitle">Terms of use</h2>
+      <p>Bridge Sessions is a free music discovery demo. It is not affiliated with Spotify AB.</p>
+      <p>You use this app at your own risk. Bridges are suggestions only — always verify artists and content in Spotify.</p>
+      <p>Do not abuse the API (automated scraping, spam). We may rate-limit abusive traffic.</p>
+      <button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="termsModal">Close</button>
+    </div>
+  </div>
+  <div id="privacyModal" class="modal hidden" role="dialog">
+    <div class="modal__card">
+      <h2>Privacy</h2>
+      <p>We do not require accounts. Bridge events may be logged anonymously if analytics are enabled.</p>
+      <p>Spotify previews are served by Spotify's embed player — see <a href="https://www.spotify.com/legal/privacy-policy/" target="_blank" rel="noopener">Spotify's privacy policy</a> for playback data.</p>
+      <p>Share links encode your intent and track IDs in the URL — only share if you're comfortable.</p>
+      <button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="privacyModal">Close</button>
+    </div>
+  </div>
+  <div id="playbackModal" class="modal hidden" role="dialog">
+    <div class="modal__card">
+      <h2>About playback</h2>
+      <p><strong>Why 30-second previews?</strong> Spotify licenses full streaming to logged-in Premium users in the Spotify app. Free web apps get preview clips unless you connect Spotify with Premium (private beta).</p>
+      <p><strong>Full songs:</strong> Tap <em>Full song</em> or open any track in Spotify.</p>
+      <p><strong>Volume & EQ:</strong> The equalizer visualizes your bridge vibe. Volume controls preview playback; mute pauses the preview.</p>
+      <button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="playbackModal">Got it</button>
+    </div>
+  </div>
+  <div id="shortcutsModal" class="modal hidden" role="dialog">
+    <div class="modal__card">
+      <h2>Keyboard shortcuts</h2>
+      <ul class="shortcut-list">
+        <li><kbd>Space</kbd> Play / pause preview</li>
+        <li><kbd>←</kbd> <kbd>→</kbd> Previous / next track</li>
+        <li><kbd>?</kbd> This help</li>
+      </ul>
+      <button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="shortcutsModal">Close</button>
+    </div>
+  </div>
+
   <div class="status-toast" id="statusToast"></div>
+  <script src="https://open.spotify.com/embed/iframe-api/v1" async></script>
+  <script src="/static/player.js"></script>
+  <script src="/static/legal.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

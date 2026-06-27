@@ -204,6 +204,8 @@ function displaySession(session) {
   }
   shareBtn.classList.remove("hidden");
   sessionBlock.scrollIntoView({ behavior: "smooth", block: "start" });
+  window.BridgeExtras?.renderStats(session);
+  window.BridgeExtras?.saveHistory(session);
 }
 
 async function fetchJSON(path, opts = {}) {
@@ -890,12 +892,11 @@ function selectTrack(idx) {
 
 function updatePlayer(track, idx) {
   const bar = document.getElementById("previewBar");
-  const embed = document.getElementById("playerEmbed");
   const app = document.querySelector(".app");
   if (!track) {
     bar?.classList.add("hidden");
     app?.classList.remove("app--has-player");
-    if (embed) embed.innerHTML = "";
+    window.BridgePlayer?._stopEq?.();
     return;
   }
   bar?.classList.remove("hidden");
@@ -909,14 +910,13 @@ function updatePlayer(track, idx) {
     artEl.style.backgroundImage = `url("${track.album_art}")`;
     artEl.style.backgroundSize = "cover";
     artEl.style.backgroundPosition = "center";
+    artEl.classList.add("bridge-player__art--spin");
   } else {
     artEl.style.backgroundImage = "";
     artEl.style.background = GRADIENTS[idx % GRADIENTS.length];
+    artEl.classList.remove("bridge-player__art--spin");
   }
-  const tid = track.track_id || parseTrackId(track.spotify_url);
-  if (embed && tid) {
-    embed.innerHTML = `<iframe src="https://open.spotify.com/embed/track/${tid}?utm_source=generator&theme=0" height="152" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
-  }
+  window.BridgePlayer?.loadTrack(track);
 }
 
 function renderTracks(tracks, { animate = false } = {}) {
@@ -960,6 +960,10 @@ function renderTracks(tracks, { animate = false } = {}) {
 
   if (tracks.length) selectTrack(0);
 }
+
+document.getElementById("surpriseBtn")?.addEventListener("click", () => {
+  window.BridgeExtras?.surpriseMe();
+});
 
 document.getElementById("comfortLoopCta")?.addEventListener("click", () => {
   switchTab("bridge");
@@ -1061,10 +1065,21 @@ document.getElementById("playerOpen")?.addEventListener("click", () => {
 
 async function boot() {
   setGreeting();
+  window.buildShareUrl = buildShareUrl;
+  window.toast = toast;
+  window.previewAnchor = previewAnchor;
+  window.EXAMPLE_ANCHORS = EXAMPLE_ANCHORS;
+  window.CONTEXT_INTENTS = CONTEXT_INTENTS;
+  window.BridgePlayer?.init();
+  window.BridgeExtras?.bindShortcuts();
   initExampleChips();
   await refreshAuthUI().catch(() => {});
   await tryLoadSharedBridge(INITIAL_HASH.params);
   await loadInsights().catch(() => {});
+  fetchJSON("/health").then(h => {
+    const el = document.getElementById("catalogSizeLabel");
+    if (el && h.chart_catalog_tracks) el.textContent = h.chart_catalog_tracks.toLocaleString();
+  }).catch(() => {});
 }
 
 boot().catch(e => toast("Error: " + e.message));

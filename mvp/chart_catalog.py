@@ -1,4 +1,4 @@
-"""Static chart catalog — ~10k popular tracks, no Spotify API keys."""
+"""Static chart catalog — up to 50k popular tracks, no Spotify API keys."""
 from __future__ import annotations
 
 import hashlib

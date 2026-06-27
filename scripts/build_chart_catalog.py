@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Build a static top-chart catalog (~10k tracks) without Spotify API keys.
+"""Build a static top-chart catalog (~50k tracks) without Spotify API keys.
 
 Source: HuggingFace maharshipandya/spotify-tracks-dataset (114k tracks with IDs).
 We keep the top N unique tracks by Spotify popularity as a chart proxy.
 
 Usage:
     python scripts/build_chart_catalog.py
-    python scripts/build_chart_catalog.py --limit 10000 --verify-sample 20
+    python scripts/build_chart_catalog.py --limit 50000 --verify-sample 20
 """
 from __future__ import annotations
 
