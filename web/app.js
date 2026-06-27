@@ -908,7 +908,7 @@ async function updatePlayer(track, idx) {
     artEl.style.backgroundImage = `url("${track.album_art}")`;
     artEl.style.backgroundSize = "cover";
     artEl.style.backgroundPosition = "center";
-    artEl.classList.add("bridge-player__art--spin");
+    artEl.classList.remove("bridge-player__art--spin");
   } else {
     artEl.style.backgroundImage = "";
     artEl.style.background = GRADIENTS[idx % GRADIENTS.length];
@@ -940,10 +940,11 @@ function updateBridgeArtPanel(track, idx) {
   if (stepEl) stepEl.textContent = `Track ${idx + 1} of ${currentTracks.length}`;
   if (noteEl) noteEl.textContent = track.explanation || "";
   if (artEl) {
+    artEl.classList.remove("bridge-art-panel__art--pulse");
+    void artEl.offsetWidth;
     if (track.album_art) {
       artEl.style.background = "";
       artEl.style.backgroundImage = `url("${track.album_art}")`;
-      artEl.classList.toggle("bridge-art-panel__art--spin", true);
       if (bgEl) {
         bgEl.style.backgroundImage = `url("${track.album_art}")`;
         bgEl.classList.remove("hidden");
@@ -951,12 +952,12 @@ function updateBridgeArtPanel(track, idx) {
     } else {
       artEl.style.backgroundImage = "";
       artEl.style.background = GRADIENTS[idx % GRADIENTS.length];
-      artEl.classList.remove("bridge-art-panel__art--spin");
       if (bgEl) {
         bgEl.style.backgroundImage = "";
         bgEl.classList.add("hidden");
       }
     }
+    artEl.classList.add("bridge-art-panel__art--pulse");
   }
 }
 
