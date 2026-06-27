@@ -17,6 +17,9 @@ from mvp.spotify_client import SpotifyAPIError, SpotifyClient, normalize_track
 from mvp.track_lookup import enrich_track_meta, lookup_track
 
 
+_openai_planner_disabled = False
+
+
 class BridgeError(Exception):
     def __init__(self, message: str, code: str = "bridge_error", status: int = 400):
         super().__init__(message)
@@ -102,8 +105,9 @@ def _plan_with_llm(
     candidates: list[dict],
     intent: str,
 ) -> tuple[list[dict], str]:
+    global _openai_planner_disabled
     settings = get_settings()
-    if not settings.bridge_planner_configured:
+    if _openai_planner_disabled or not settings.bridge_planner_configured:
         return _plan_heuristic(anchor, candidates, intent), "heuristic"
 
     valid_ids = {c["id"] for c in candidates}
@@ -134,7 +138,8 @@ Return JSON only:
 {{"tracks": [{{"id": "...", "explanation": "...", "novelty_score": 0.0-1.0}}]}}"""
 
     def _openai_call() -> str:
-        with httpx.Client(timeout=8.0) as client:
+        global _openai_planner_disabled
+        with httpx.Client(timeout=httpx.Timeout(3.0, connect=2.0)) as client:
             response = client.post(
                 "https://api.openai.com/v1/chat/completions",
                 headers={"Authorization": f"Bearer {settings.effective_openai_key}"},
@@ -145,12 +150,15 @@ Return JSON only:
                     "temperature": 0.4,
                 },
             )
+            if response.status_code in (401, 403, 429):
+                _openai_planner_disabled = True
+                raise ValueError(f"openai_{response.status_code}")
             response.raise_for_status()
             return response.json()["choices"][0]["message"]["content"] or ""
 
     try:
         with ThreadPoolExecutor(max_workers=1) as pool:
-            raw = pool.submit(_openai_call).result(timeout=8)
+            raw = pool.submit(_openai_call).result(timeout=3.5)
         match = re.search(r"\{.*\}", raw, re.S)
         if not match:
             raise ValueError("no JSON in planner response")

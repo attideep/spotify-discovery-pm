@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     corpus_path: str = "data/corpus.json"
     allow_demo_mode: bool = True
     rate_limit_per_minute: int = 30
+    # Set true only when OpenAI billing is active — avoids 10s timeouts on quota errors
+    openai_bridge_planner_enabled: bool = False
 
     @property
     def effective_openai_key(self) -> str:
@@ -44,7 +46,7 @@ class Settings(BaseSettings):
 
     @property
     def bridge_planner_configured(self) -> bool:
-        return self.openai_api_key_valid
+        return self.openai_api_key_valid and self.openai_bridge_planner_enabled
 
     @property
     def spotify_configured(self) -> bool:

@@ -24,7 +24,6 @@ const PLANNER_LABELS = {
   openai: "AI planned",
   gemini: "AI planned",
   claude: "AI planned",
-  heuristic: "Smart match",
   shared: "Shared session",
 };
 
@@ -158,7 +157,8 @@ async function tryLoadSharedBridge(shareParams) {
 
 function displaySession(session) {
   lastSession = session;
-  document.getElementById("sessionBlock").classList.remove("hidden");
+  const sessionBlock = document.getElementById("sessionBlock");
+  sessionBlock.classList.remove("hidden");
   document.getElementById("sessionTitle").textContent = `Bridge from ${session.anchor_track}`;
   document.getElementById("sessionSummary").textContent = session.session_summary;
   document.getElementById("sessionMode").textContent = session.mode === "live" ? "Live beta" : "Free";
@@ -182,6 +182,7 @@ function displaySession(session) {
     saveBtn.classList.add("hidden");
   }
   shareBtn.classList.remove("hidden");
+  sessionBlock.scrollIntoView({ behavior: "smooth", block: "start" });
 }
 
 async function fetchJSON(path, opts = {}) {
@@ -190,7 +191,7 @@ async function fetchJSON(path, opts = {}) {
   if (!r.ok) {
     let msg = data.error || data.detail || r.statusText;
     if (r.status >= 500 && (!msg || msg === "Internal Server Error")) {
-      msg = "Server error — try again in a moment. Bridges still work in Smart match mode.";
+      msg = "Server error — try again in a moment.";
     }
     const err = new Error(msg);
     err.code = data.code;
