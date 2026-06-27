@@ -31,8 +31,8 @@
     <div class="main" data-accent="bridge" id="mainArea">
       <header class="topbar topbar--bridge-only">
         <div class="topbar__brand">
-          <img src="/static/icon-bridge.svg" alt="" class="topbar__brand-icon" width="28" height="28" />
-          <span>Bridge</span>
+          <span><img src="/static/icon-bridge.svg" alt="" class="topbar__brand-icon" width="28" height="28" /> Bridge</span>
+          <span class="topbar__disclaimer">Not affiliated with Spotify</span>
         </div>
         <div class="topbar__search">
           <svg class="topbar__search-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.7 12.3 11 9.6a5.5 5.5 0 1 0-1.4 1.4l2.7 2.7a1 1 0 0 0 1.4-1.4zM6.5 10A3.5 3.5 0 1 1 10 6.5 3.5 3.5 0 0 1 6.5 10z"/></svg>
@@ -162,12 +162,14 @@
     <footer class="now-playing hidden" id="previewBar">
       <div class="bridge-player bridge-player--minimal">
         <div class="bridge-player__row">
-          <div class="now-playing__art bridge-player__art" id="playerArt"></div>
-          <div class="bridge-player__meta">
-            <div class="now-playing__title" id="playerTitle">Tap a track</div>
-            <div class="now-playing__artist" id="playerArtist">Bridge Sessions</div>
-            <button type="button" class="bridge-player__spotify-btn" id="playerOpen">▶ Full song in Spotify</button>
+          <div class="bridge-player__track">
+            <div class="now-playing__art bridge-player__art" id="playerArt"></div>
+            <div class="bridge-player__meta">
+              <div class="now-playing__title" id="playerTitle">Tap a track</div>
+              <div class="now-playing__artist" id="playerArtist">Bridge Sessions</div>
+            </div>
           </div>
+          <button type="button" class="bridge-player__spotify-btn" id="playerOpen" title="Open full song in Spotify">Spotify ↗</button>
           <div class="bridge-player__controls">
             <button type="button" class="bridge-player__play" id="playerPlayBtn" aria-label="Play">▶</button>
             <button type="button" class="bridge-player__nav" id="playerPrev" aria-label="Previous">‹</button>
@@ -199,17 +201,19 @@
     </footer>
   </div>
 
-  <div id="authModal" class="modal hidden" role="dialog">
+  <div id="authModal" class="modal hidden" role="dialog" aria-labelledby="authModalTitle">
     <div class="modal__card">
+      <p class="auth-modal__brand">Bridge Sessions</p>
+      <p class="auth-modal__domain" id="authModalDomain"></p>
       <h2 id="authModalTitle">Sign in</h2>
-      <p style="color:var(--text-subdued);font-size:14px;margin:0 0 8px">Save bridges and sync across devices.</p>
+      <p class="auth-modal__note">Save bridges to your library. This is <strong>not</strong> Spotify’s login — accounts are only for Bridge Sessions.</p>
       <div class="auth-form">
         <div id="authNameField" class="hidden">
           <label class="form-label">Display name</label>
           <input class="form-input" id="authName" type="text" placeholder="Optional" />
         </div>
         <label class="form-label">Email</label>
-        <input class="form-input" id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" />
+        <input class="form-input" id="authEmail" type="email" autocomplete="username" placeholder="you@example.com" />
         <label class="form-label">Password</label>
         <input class="form-input" id="authPassword" type="password" autocomplete="current-password" placeholder="Min. 8 characters" />
         <p id="authError" class="auth-form__error hidden"></p>

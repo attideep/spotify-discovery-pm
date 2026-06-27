@@ -245,6 +245,8 @@
 
     openAuth(mode = "login") {
       $("authModal")?.classList.remove("hidden");
+      const domainEl = $("authModalDomain");
+      if (domainEl) domainEl.textContent = location.host;
       $("authModalTitle").textContent = mode === "signup" ? "Create account" : "Sign in";
       $("authSubmitBtn").textContent = mode === "signup" ? "Sign up" : "Sign in";
       $("authSubmitBtn").dataset.mode = mode;
