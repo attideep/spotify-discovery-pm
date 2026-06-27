@@ -891,12 +891,15 @@ function selectTrack(idx) {
 function updatePlayer(track, idx) {
   const bar = document.getElementById("previewBar");
   const embed = document.getElementById("playerEmbed");
+  const app = document.querySelector(".app");
   if (!track) {
     bar?.classList.add("hidden");
+    app?.classList.remove("app--has-player");
     if (embed) embed.innerHTML = "";
     return;
   }
   bar?.classList.remove("hidden");
+  app?.classList.add("app--has-player");
   document.getElementById("playerTitle").textContent = track.name;
   document.getElementById("playerArtist").textContent = track.artist;
   document.getElementById("playerStep").textContent = `Track ${idx + 1} of ${currentTracks.length}`;

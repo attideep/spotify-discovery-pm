@@ -18,10 +18,11 @@
   <meta name="twitter:description" content="Gradual music discovery — 8 explained steps from your anchor track." />
   <meta name="twitter:image" content="https://spotify-discovery-pm.vercel.app/static/og.svg" />
   <style>
-    html,body{height:100%;margin:0;background:#000;color:#fff;overflow:hidden}
+    html,body{height:100%;width:100%;margin:0;background:#121212;color:#fff;overflow:hidden}
     .panel:not(.active){display:none!important}
-    .app{display:grid;grid-template-columns:1fr;grid-template-rows:1fr auto auto;height:100dvh;overflow:hidden}
-    @media (min-width:769px){.app{grid-template-columns:240px 1fr;grid-template-rows:1fr 72px}}
+    .app{display:grid;grid-template-columns:1fr;grid-template-rows:1fr;height:100dvh;width:100%;min-height:100dvh;overflow:hidden}
+    .app.app--has-player{grid-template-rows:1fr auto}
+    @media (min-width:769px){.app{grid-template-columns:240px 1fr}}
   </style>
   <link rel="stylesheet" href="/static/styles.css" />
 </head>
