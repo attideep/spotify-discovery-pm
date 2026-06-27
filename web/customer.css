@@ -1,0 +1,245 @@
+
+/* Customer app (/app) styles */
+
+.topbar__brand-icon {
+  display: block;
+  width: 28px;
+  height: 28px;
+  flex-shrink: 0;
+}
+
+.topbar__auth {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.topbar__auth .btn-spotify--sm {
+  padding: 8px 14px;
+  font-size: 12px;
+}
+
+.auth-user-pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-subdued);
+}
+
+.auth-user-pill strong {
+  color: var(--text-base);
+  font-weight: 600;
+}
+
+.mood-chips {
+  margin-bottom: 12px;
+}
+
+.chip--mood {
+  font-size: 13px;
+}
+
+.continue-bridge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  background: rgba(30, 215, 96, 0.08);
+  border: 1px solid rgba(30, 215, 96, 0.25);
+  border-radius: var(--radius-md);
+}
+
+.continue-bridge__title {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.continue-bridge__sub {
+  font-size: 12px;
+  color: var(--text-subdued);
+  margin-top: 4px;
+}
+
+.saved-bridges {
+  margin-bottom: 20px;
+}
+
+.saved-bridges__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+}
+
+.saved-bridges__head h3 {
+  margin: 0;
+  font-size: 15px;
+}
+
+.saved-bridges__count {
+  font-size: 11px;
+  color: var(--green);
+  font-weight: 700;
+}
+
+.saved-bridges__scroll {
+  display: flex;
+  gap: 10px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  -webkit-overflow-scrolling: touch;
+}
+
+.saved-bridge-card {
+  flex: 0 0 auto;
+  min-width: 180px;
+  max-width: 220px;
+  text-align: left;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  transition: border-color var(--transition), background var(--transition);
+}
+
+.saved-bridge-card:hover {
+  border-color: rgba(30, 215, 96, 0.4);
+  background: var(--bg-card-hover);
+}
+
+.saved-bridge-card__title {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.saved-bridge-card__meta {
+  display: block;
+  font-size: 11px;
+  color: var(--text-subdued);
+  line-height: 1.35;
+}
+
+.search-results__loading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  font-size: 13px;
+  color: var(--text-subdued);
+}
+
+.search-results__spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-top-color: var(--green);
+  border-radius: 50%;
+  animation: customer-spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+
+@keyframes customer-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Minimal player */
+.bridge-player--minimal .bridge-player__eq {
+  display: none;
+}
+
+.bridge-player__seek {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0 0 8px;
+  position: relative;
+  z-index: 1;
+}
+
+.bridge-player__seek input[type="range"] {
+  flex: 1;
+  accent-color: var(--green);
+  height: 4px;
+}
+
+.bridge-player__time {
+  font-size: 10px;
+  color: var(--text-subdued);
+  min-width: 32px;
+  font-variant-numeric: tabular-nums;
+}
+
+.bridge-player__spotify-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 6px 12px;
+  background: rgba(30, 215, 96, 0.15);
+  color: var(--green);
+  border: 1px solid rgba(30, 215, 96, 0.35);
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: background var(--transition);
+}
+
+.bridge-player__spotify-btn:hover {
+  background: rgba(30, 215, 96, 0.25);
+}
+
+.track-row--customer .track-row__link {
+  display: none;
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin: 16px 0;
+}
+
+.auth-form__error {
+  color: #f87171;
+  font-size: 13px;
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--text-subdued);
+  font-size: 12px;
+  margin: 8px 0;
+}
+
+.auth-divider::before,
+.auth-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border-subtle);
+}
+
+@media (max-width: 768px) {
+  .topbar--bridge-only {
+    flex-wrap: wrap;
+  }
+
+  .topbar__auth {
+    order: 3;
+    width: 100%;
+    justify-content: flex-end;
+    padding-bottom: 4px;
+  }
+}

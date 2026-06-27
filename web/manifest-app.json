@@ -10,10 +10,16 @@
   "theme_color": "#1ed760",
   "icons": [
     {
-      "src": "/static/icon.svg",
+      "src": "/static/icon-bridge.svg",
       "sizes": "any",
       "type": "image/svg+xml",
       "purpose": "any"
+    },
+    {
+      "src": "/static/icon-bridge.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
     }
   ]
 }

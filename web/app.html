@@ -7,17 +7,16 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Bridge" />
-  <link rel="apple-touch-icon" href="/static/icon.svg" />
+  <link rel="apple-touch-icon" href="/static/icon-bridge.svg" />
   <title>Bridge Sessions — discover music gradually</title>
-  <meta name="description" content="Free 8-track listening bridges from a song you love toward something new. Each step explained. No login." />
+  <meta name="description" content="8-track listening bridges from a song you love toward something new. Save bridges when you sign in." />
   <meta name="theme-color" content="#1ed760" />
-  <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
+  <link rel="icon" href="/static/icon-bridge.svg" type="image/svg+xml" />
   <link rel="manifest" href="/static/manifest-app.json" />
-  <meta property="og:type" content="website" />
   <meta property="og:url" content="https://spotify-discovery-pm.vercel.app/app" />
   <meta property="og:title" content="Bridge Sessions" />
-  <meta property="og:description" content="8-track journeys from familiar → novel. Each step explained." />
-  <meta property="og:image" content="https://spotify-discovery-pm.vercel.app/static/og.svg" />
+  <meta property="og:description" content="8 explained steps from a song you love toward something new. Save bridges when you sign in." />
+  <meta property="og:image" content="https://spotify-discovery-pm.vercel.app/static/og-app.svg" />
   <style>
     html,body{height:100%;width:100%;margin:0;background:#121212;color:#fff;overflow:hidden;touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
     .app{display:grid;grid-template-columns:1fr;grid-template-rows:1fr;height:var(--app-height,100dvh);width:100%;min-height:var(--app-height,100dvh);max-height:var(--app-height,100dvh);overflow:hidden}
@@ -25,20 +24,28 @@
   </style>
   <link rel="stylesheet" href="/static/styles.css" />
   <link rel="stylesheet" href="/static/player.css" />
+  <link rel="stylesheet" href="/static/customer.css" />
 </head>
 <body>
   <div class="app app--bridge-only">
     <div class="main" data-accent="bridge" id="mainArea">
       <header class="topbar topbar--bridge-only">
         <div class="topbar__brand">
-          <svg width="28" height="28" viewBox="0 0 24 24" fill="#1ed760" aria-hidden="true"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg>
-          <span>Bridge Sessions</span>
-          <span class="sidebar__badge">Free</span>
+          <img src="/static/icon-bridge.svg" alt="" class="topbar__brand-icon" width="28" height="28" />
+          <span>Bridge</span>
         </div>
         <div class="topbar__search">
           <svg class="topbar__search-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.7 12.3 11 9.6a5.5 5.5 0 1 0-1.4 1.4l2.7 2.7a1 1 0 0 0 1.4-1.4zM6.5 10A3.5 3.5 0 1 1 10 6.5 3.5 3.5 0 0 1 6.5 10z"/></svg>
           <input type="text" id="globalSearch" placeholder="Search songs to anchor…" autocomplete="off" />
           <div id="searchResults" class="search-results hidden" role="listbox"></div>
+        </div>
+        <div class="topbar__auth" id="authSignedOut">
+          <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="authLoginBtn">Sign in</button>
+          <button type="button" class="btn-spotify btn-spotify--green btn-spotify--sm" id="authSignupBtn">Sign up</button>
+        </div>
+        <div class="topbar__auth hidden" id="authSignedIn">
+          <span class="auth-user-pill">Hi, <strong id="authUserName">you</strong></span>
+          <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="authLogoutBtn">Sign out</button>
         </div>
       </header>
 
@@ -46,35 +53,50 @@
         <section class="panel active" id="panel-bridge">
           <div class="bridge-hero bridge-hero--compact">
             <div class="bridge-hero__content">
-              <p class="bridge-hero__type">Free · No login</p>
-              <h1 class="bridge-hero__title">Discover music through gradual bridges</h1>
-              <p class="bridge-hero__desc">Pick a song you love. Get an 8-track journey toward something new — each step explained. <span id="catalogSizeLabel">50,000+</span> songs.</p>
+              <p class="bridge-hero__type">Gradual discovery · <span id="catalogSizeLabel">50,000+</span> songs</p>
+              <h1 class="bridge-hero__title">Your bridge from familiar to new</h1>
+              <p class="bridge-hero__desc">Pick an anchor track, set your vibe, and get 8 explained steps toward fresh music — no random jumps.</p>
             </div>
           </div>
 
+          <div id="continueBridge" class="continue-bridge hidden">
+            <div>
+              <div class="continue-bridge__title" id="continueBridgeTitle">Continue your last bridge</div>
+              <div class="continue-bridge__sub">Pick up where you left off</div>
+            </div>
+            <button type="button" class="btn-spotify btn-spotify--green btn-spotify--sm" data-continue>Resume</button>
+          </div>
+
+          <div id="savedBridges" class="saved-bridges hidden" aria-label="Saved bridges"></div>
+
           <div class="bridge-form">
-            <label class="form-label">Anchor track — song name or Spotify link</label>
+            <label class="form-label">Anchor track</label>
             <div class="anchor-search">
-              <input class="form-input" id="anchorInput" type="text" placeholder="e.g. Blinding Lights, The Weeknd — or paste a Spotify link" autocomplete="off" />
+              <input class="form-input" id="anchorInput" type="text" placeholder="Song name, artist, or Spotify link" autocomplete="off" />
               <div id="anchorSearchResults" class="search-results hidden" role="listbox"></div>
             </div>
             <div id="anchorPreview" class="anchor-preview hidden"></div>
             <div class="chip-row chip-row--compact" id="anchorChips"></div>
+
+            <label class="form-label">Your vibe</label>
+            <div class="chip-row chip-row--compact mood-chips" id="moodChips"></div>
+
             <label class="form-label">Your intent</label>
             <textarea class="form-input" id="intentInput" rows="2" placeholder="Like Khruangbin but more energetic for a morning run"></textarea>
-            <label class="form-label">Listening context</label>
             <div class="chip-row chip-row--compact" id="contextChips"></div>
             <div class="chip-row chip-row--compact" id="intentChips"></div>
+
             <div class="bridge-actions">
-              <button id="buildBtn" class="btn-spotify btn-spotify--green">Generate bridge session</button>
+              <button id="buildBtn" class="btn-spotify btn-spotify--green">Generate bridge</button>
               <button type="button" id="surpriseBtn" class="btn-spotify btn-spotify--ghost">Surprise me</button>
             </div>
-            <div id="bridgeLoader" class="bridge-loader hidden" aria-live="polite" aria-busy="false">
+
+            <div id="bridgeLoader" class="bridge-loader hidden" aria-live="polite">
               <div class="bridge-loader__card">
-                <div class="bridge-loader__spinner" aria-hidden="true"></div>
+                <div class="bridge-loader__spinner"></div>
                 <p class="bridge-loader__title" id="bridgeLoaderTitle">Building your bridge…</p>
-                <p class="bridge-loader__subtitle" id="bridgeLoaderSubtitle">Sequencing tracks from familiar to new</p>
-                <div class="bridge-loader__progress" aria-hidden="true"><div class="bridge-loader__progress-fill" id="bridgeLoaderProgress"></div></div>
+                <p class="bridge-loader__subtitle" id="bridgeLoaderSubtitle"></p>
+                <div class="bridge-loader__progress"><div class="bridge-loader__progress-fill" id="bridgeLoaderProgress"></div></div>
               </div>
             </div>
             <p id="bridgeError" class="bridge-error hidden"></p>
@@ -84,16 +106,15 @@
             <div class="section-header">
               <h2 id="sessionTitle">Your bridge</h2>
               <div class="session-header-actions">
-                <span id="sessionMode" class="sidebar__badge"></span>
-                <span id="sessionPlanner" class="sidebar__badge sidebar__badge--muted hidden"></span>
-                <button type="button" id="shareBridgeBtn" class="btn-spotify btn-spotify--ghost btn-spotify--sm hidden">Share bridge</button>
+                <button type="button" id="saveBridgeBtn" class="btn-spotify btn-spotify--green btn-spotify--sm hidden">Save bridge</button>
+                <button type="button" id="shareBridgeBtn" class="btn-spotify btn-spotify--ghost btn-spotify--sm hidden">Share</button>
               </div>
             </div>
             <p id="sessionSummary" class="session-summary"></p>
-            <div id="bridgeStats" class="bridge-stats hidden" aria-label="Bridge session stats"></div>
-            <div id="noveltyJourney" class="novelty-journey hidden" aria-label="Novelty arc from familiar to novel"></div>
+            <div id="bridgeStats" class="bridge-stats hidden"></div>
+            <div id="noveltyJourney" class="novelty-journey hidden"></div>
             <div class="track-list-header">
-              <span>#</span><span>Title</span><span>Novelty</span><span></span><span></span>
+              <span>#</span><span>Title</span><span>Novelty</span><span></span>
             </div>
             <div id="tracks"></div>
           </div>
@@ -102,17 +123,16 @@
     </div>
 
     <footer class="now-playing hidden" id="previewBar">
-      <div class="bridge-player">
-        <canvas id="eqCanvas" class="bridge-player__eq" aria-hidden="true"></canvas>
+      <div class="bridge-player bridge-player--minimal">
         <div class="bridge-player__row">
           <div class="now-playing__art bridge-player__art" id="playerArt"></div>
           <div class="bridge-player__meta">
-            <div class="now-playing__title" id="playerTitle">Tap a track to preview</div>
+            <div class="now-playing__title" id="playerTitle">Tap a track</div>
             <div class="now-playing__artist" id="playerArtist">Bridge Sessions</div>
-            <span class="bridge-player__badge" id="playerBadge">30s preview · Full song in Spotify</span>
+            <button type="button" class="bridge-player__spotify-btn" id="playerOpen">▶ Full song in Spotify</button>
           </div>
           <div class="bridge-player__controls">
-            <button type="button" class="bridge-player__play" id="playerPlayBtn" aria-label="Play or pause">▶</button>
+            <button type="button" class="bridge-player__play" id="playerPlayBtn" aria-label="Play">▶</button>
             <button type="button" class="bridge-player__nav" id="playerPrev" aria-label="Previous">‹</button>
             <button type="button" class="bridge-player__nav" id="playerNext" aria-label="Next">›</button>
           </div>
@@ -125,66 +145,55 @@
           <div class="bridge-player__actions">
             <span class="now-playing__step" id="playerStep"></span>
             <button type="button" class="chip chip--sm" id="playerTourBtn">Auto tour</button>
-            <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="playerOpen">Full song</button>
-            <button type="button" class="bridge-player__menu" id="playerMenuBtn" aria-label="Player menu">⋯</button>
+            <button type="button" class="bridge-player__menu" id="playerMenuBtn" aria-label="Menu">⋯</button>
           </div>
         </div>
-        <div class="bridge-player__eq-sliders">
-          <label class="bridge-player__eq-label">Bass <input type="range" id="eqBass" min="-12" max="12" value="0" aria-label="Bass" /></label>
-          <label class="bridge-player__eq-label">Mid <input type="range" id="eqMid" min="-12" max="12" value="0" aria-label="Mid" /></label>
-          <label class="bridge-player__eq-label">Treble <input type="range" id="eqTreble" min="-12" max="12" value="0" aria-label="Treble" /></label>
+        <div class="bridge-player__seek">
+          <span class="bridge-player__time" id="playerTimeCurrent">0:00</span>
+          <input type="range" id="playerSeek" min="0" max="1000" value="0" aria-label="Seek preview" />
+          <span class="bridge-player__time" id="playerTimeDur">0:30</span>
         </div>
         <div id="playerMenu" class="bridge-player__menu-panel hidden">
-          <button type="button" data-legal="termsModal">Terms of use</button>
+          <button type="button" data-legal="termsModal">Terms</button>
           <button type="button" data-legal="privacyModal">Privacy</button>
           <button type="button" data-legal="playbackModal">About playback</button>
-          <button type="button" data-legal="shortcutsModal">Keyboard shortcuts</button>
         </div>
       </div>
     </footer>
   </div>
 
-  <div id="termsModal" class="modal hidden" role="dialog" aria-labelledby="termsTitle">
+  <div id="authModal" class="modal hidden" role="dialog">
     <div class="modal__card">
-      <h2 id="termsTitle">Terms of use</h2>
-      <p>Bridge Sessions is a free music discovery demo. It is not affiliated with Spotify AB.</p>
-      <p>You use this app at your own risk. Bridges are suggestions only — always verify artists and content in Spotify.</p>
-      <button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="termsModal">Close</button>
+      <h2 id="authModalTitle">Sign in</h2>
+      <p style="color:var(--text-subdued);font-size:14px;margin:0 0 8px">Save bridges and sync across devices.</p>
+      <div class="auth-form">
+        <div id="authNameField" class="hidden">
+          <label class="form-label">Display name</label>
+          <input class="form-input" id="authName" type="text" placeholder="Optional" />
+        </div>
+        <label class="form-label">Email</label>
+        <input class="form-input" id="authEmail" type="email" autocomplete="email" placeholder="you@example.com" />
+        <label class="form-label">Password</label>
+        <input class="form-input" id="authPassword" type="password" autocomplete="current-password" placeholder="Min. 8 characters" />
+        <p id="authError" class="auth-form__error hidden"></p>
+        <button type="button" class="btn-spotify btn-spotify--green" id="authSubmitBtn">Sign in</button>
+      </div>
+      <div class="auth-divider">or</div>
+      <button type="button" class="btn-spotify btn-spotify--ghost" id="authGoogleBtn" style="width:100%">Continue with Google</button>
+      <button type="button" class="btn-spotify btn-spotify--ghost" data-close-auth style="margin-top:12px;width:100%">Cancel</button>
     </div>
   </div>
-  <div id="privacyModal" class="modal hidden" role="dialog">
-    <div class="modal__card">
-      <h2>Privacy</h2>
-      <p>We do not require accounts. Bridge events may be logged anonymously if analytics are enabled.</p>
-      <p>Preview audio is matched via Apple Music/iTunes search and played in your browser.</p>
-      <button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="privacyModal">Close</button>
-    </div>
-  </div>
-  <div id="playbackModal" class="modal hidden" role="dialog">
-    <div class="modal__card">
-      <h2>About playback</h2>
-      <p>Preview clips are ~30 seconds — music licensing limits free full streaming in the browser.</p>
-      <p><strong>Full songs:</strong> Tap <em>Full song</em> to open the track in Spotify.</p>
-      <button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="playbackModal">Got it</button>
-    </div>
-  </div>
-  <div id="shortcutsModal" class="modal hidden" role="dialog">
-    <div class="modal__card">
-      <h2>Keyboard shortcuts</h2>
-      <ul class="shortcut-list">
-        <li><kbd>Space</kbd> Play / pause preview</li>
-        <li><kbd>←</kbd> <kbd>→</kbd> Previous / next track</li>
-        <li><kbd>?</kbd> This help</li>
-      </ul>
-      <button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="shortcutsModal">Close</button>
-    </div>
-  </div>
+
+  <div id="termsModal" class="modal hidden" role="dialog"><div class="modal__card"><h2>Terms</h2><p style="color:var(--text-subdued)">Bridge Sessions is a music discovery demo, not affiliated with Spotify.</p><button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="termsModal">Close</button></div></div>
+  <div id="privacyModal" class="modal hidden" role="dialog"><div class="modal__card"><h2>Privacy</h2><p style="color:var(--text-subdued)">Account data is stored to save your bridges. Preview audio uses public catalogs.</p><button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="privacyModal">Close</button></div></div>
+  <div id="playbackModal" class="modal hidden" role="dialog"><div class="modal__card"><h2>Playback</h2><p style="color:var(--text-subdued)">~30s previews in-browser. Tap <strong>Full song in Spotify</strong> for the complete track.</p><button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="playbackModal">Got it</button></div></div>
 
   <div class="status-toast" id="statusToast"></div>
 
-  <script>window.APP_VARIANT = "bridge-only";</script>
+  <script>window.APP_VARIANT = "bridge-only"; window.PLAYER_MINIMAL = true;</script>
   <script src="/static/player.js"></script>
   <script src="/static/legal.js"></script>
   <script src="/static/app.js"></script>
+  <script src="/static/customer.js"></script>
 </body>
 </html>
