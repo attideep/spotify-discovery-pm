@@ -70,12 +70,22 @@ See [`docs/PRODUCTION.md`](docs/PRODUCTION.md) for Vercel setup, environment var
 
 ---
 
+## For reviewers
+
+**5-minute walkthrough:** [`docs/REVIEWER_WALKTHROUGH.md`](docs/REVIEWER_WALKTHROUGH.md)
+
+**Phase 1 rollout:** Comfort Loop Curators in commute context — see the rollout card on the Home tab.
+
+---
+
 ## Environment
 
 | Variable | Purpose |
 |----------|---------|
 | `ALLOW_DEMO_MODE` | Public free mode without login (default in production) |
-| `ANTHROPIC_API_KEY` | Optional — Claude bridge planner + richer Ask answers |
+| `ANTHROPIC_API_KEY` | Claude bridge planner (shows **AI planned** badge) + richer Ask answers |
+| `DATABASE_URL` | Optional Supabase — bridge analytics + distributed rate limits |
+| `RATE_LIMIT_PER_MINUTE` | Abuse protection (default 30) |
 | `SPOTIFY_CLIENT_ID/SECRET` | Optional — full catalog search + save to playlist |
 | `SESSION_SECRET` | Signed session cookies for OAuth |
 

@@ -104,3 +104,25 @@ git add data/chart_catalog.json
 ```
 
 Source CSV (`data/.spotify_tracks_dataset.csv`) is gitignored; download separately or use the HuggingFace dataset referenced in the build script.
+
+---
+
+## Phase 2: production hardening
+
+| Feature | Env var | Notes |
+|---------|---------|-------|
+| Bridge analytics | `DATABASE_URL` | Supabase Postgres — auto-creates `bridge_events` table on startup |
+| Rate limiting | `RATE_LIMIT_PER_MINUTE` | Default 30/min per IP on `/api/bridge` and `/api/ask` |
+| Metrics | — | `GET /api/metrics` — bridge counts when DB connected |
+| Custom domain | Vercel settings | Project → Domains |
+
+### Supabase setup
+
+1. Create a free Supabase project → Settings → Database → connection string (URI)
+2. Add `DATABASE_URL` to Vercel env vars
+3. Redeploy — schema is created on first request
+
+### Custom domain
+
+1. Vercel → Project → Settings → Domains → add your domain
+2. If using OAuth, update `SPOTIFY_REDIRECT_URI`, `API_BASE_URL`, `WEB_BASE_URL`

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from fastapi import Cookie, FastAPI, HTTPException, Response
+from fastapi import Cookie, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
@@ -24,6 +24,8 @@ from mvp.auth import (
 from mvp.bridge import BridgeError, create_bridge_session, restore_bridge_session, save_bridge_to_playlist
 from mvp.chart_catalog import catalog_count, search_tracks as chart_search
 from mvp.parse import parse_track_id, resolve_track_query
+from mvp.persistence import ensure_schema, log_bridge_event, metrics_summary
+from mvp.rate_limit import enforce_rate_limit
 from mvp.track_lookup import enrich_track_meta, lookup_track
 from mvp.session import (
     COOKIE_OAUTH,
@@ -104,6 +106,7 @@ def _spotify_error(exc: SpotifyAPIError) -> JSONResponse:
 @app.on_event("startup")
 def startup() -> None:
     _ensure_indexed()
+    ensure_schema()
 
 
 @app.get("/health")
@@ -118,7 +121,21 @@ def health() -> dict:
         "chart_catalog_tracks": catalog_count(),
         "llm_configured": bool(settings.anthropic_api_key),
         "allow_demo_mode": settings.allow_demo_mode,
+        "persistence_enabled": settings.persistence_enabled,
+        "rate_limit_per_minute": settings.rate_limit_per_minute,
     }
+
+
+@app.get("/api/metrics")
+def api_metrics() -> dict:
+    settings = get_settings()
+    base = {
+        "status": "ok",
+        "llm_configured": bool(settings.anthropic_api_key),
+        "rate_limit_per_minute": settings.rate_limit_per_minute,
+    }
+    base.update(metrics_summary())
+    return base
 
 
 @app.post("/api/ingest")
@@ -154,7 +171,8 @@ def api_insights() -> dict:
 
 
 @app.post("/api/ask")
-def api_ask(body: AskBody) -> dict:
+def api_ask(body: AskBody, request: Request) -> dict:
+    enforce_rate_limit(request, scope="ask")
     store = _ensure_indexed()
     resp = ask(body.question, store)
     return resp.model_dump()
@@ -295,8 +313,10 @@ def api_search_tracks(q: str) -> dict:
 @app.post("/api/bridge")
 def api_bridge(
     body: BridgeBody,
+    request: Request,
     bridge_session: str | None = Cookie(default=None, alias=COOKIE_SESSION),
 ) -> JSONResponse:
+    enforce_rate_limit(request, scope="bridge")
     tid = resolve_track_query(body.anchor) if body.anchor else None
     if body.anchor and body.anchor.strip() and not tid:
         raise HTTPException(
@@ -318,7 +338,15 @@ def api_bridge(
         return _spotify_error(e)
 
     payload = session.model_dump()
-    payload["mode"] = "demo" if body.demo or not client else "live"
+    mode = "demo" if body.demo or not client else "live"
+    payload["mode"] = mode
+    log_bridge_event(
+        intent=session.intent,
+        anchor_id=session.anchor_id,
+        track_ids=[t.track_id for t in session.tracks],
+        planner=session.planner,
+        mode=mode,
+    )
     resp = JSONResponse(payload)
     new_cookie = refreshed_session_cookie(bridge_session)
     if new_cookie:

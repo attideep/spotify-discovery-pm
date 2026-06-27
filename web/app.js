@@ -13,6 +13,19 @@ const EXAMPLE_INTENTS = [
   "Psychedelic groove — safe steps toward something new",
 ];
 
+const CONTEXT_INTENTS = [
+  { label: "Commute", text: "Commute — steady energy, gradual novelty from my anchor" },
+  { label: "Focus", text: "Focus work — smooth textures, low distraction" },
+  { label: "Workout", text: "Workout — build energy as the bridge progresses" },
+  { label: "Wind down", text: "Wind down — calmer tracks toward the end" },
+];
+
+const PLANNER_LABELS = {
+  claude: "AI planned",
+  heuristic: "Smart match",
+  shared: "Shared session",
+};
+
 let isConnected = false;
 let lastSession = null;
 let currentTracks = [];
@@ -147,6 +160,16 @@ function displaySession(session) {
   document.getElementById("sessionTitle").textContent = `Bridge from ${session.anchor_track}`;
   document.getElementById("sessionSummary").textContent = session.session_summary;
   document.getElementById("sessionMode").textContent = session.mode === "live" ? "Live beta" : "Free";
+  const plannerEl = document.getElementById("sessionPlanner");
+  const plannerLabel = PLANNER_LABELS[session.planner] || "";
+  if (plannerEl) {
+    if (plannerLabel) {
+      plannerEl.textContent = plannerLabel;
+      plannerEl.classList.remove("hidden");
+    } else {
+      plannerEl.classList.add("hidden");
+    }
+  }
   renderTracks(session.tracks);
 
   const saveBtn = document.getElementById("savePlaylistBtn");
@@ -270,6 +293,18 @@ function initExampleChips() {
       document.getElementById("intentInput").value = text;
     });
   });
+
+  const contextEl = document.getElementById("contextChips");
+  if (contextEl) {
+    contextEl.innerHTML = CONTEXT_INTENTS.map(c =>
+      `<button type="button" class="chip chip--context">${c.label}</button>`
+    ).join("");
+    contextEl.querySelectorAll(".chip").forEach((btn, i) => {
+      btn.addEventListener("click", () => {
+        document.getElementById("intentInput").value = CONTEXT_INTENTS[i].text;
+      });
+    });
+  }
 }
 
 document.querySelectorAll(".nav-item, .media-card, [data-tab]").forEach(el => {
@@ -830,6 +865,12 @@ function renderTracks(tracks) {
 
   if (tracks.length) updatePlayer(tracks[0], 0);
 }
+
+document.getElementById("comfortLoopCta")?.addEventListener("click", () => {
+  switchTab("bridge");
+  document.getElementById("intentInput").value = CONTEXT_INTENTS[0].text;
+  document.getElementById("anchorInput")?.focus();
+});
 
 document.getElementById("startBridgeBtn")?.addEventListener("click", () => {
   switchTab("bridge");

@@ -517,6 +517,76 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   line-height: 1.35;
 }
 
+.sidebar__badge--muted {
+  background: rgba(255,255,255,0.08);
+  color: var(--text-subdued);
+  border-color: rgba(255,255,255,0.12);
+}
+
+.rollout-card {
+  margin: 0 0 28px;
+  padding: 24px;
+  border-radius: var(--radius-lg);
+  background: linear-gradient(135deg, rgba(30,215,96,0.12), rgba(18,18,18,0.9));
+  border: 1px solid rgba(30,215,96,0.25);
+}
+
+.rollout-card__eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--green);
+  margin: 0 0 8px;
+}
+
+.rollout-card__title {
+  font-size: clamp(20px, 4vw, 26px);
+  font-weight: 800;
+  margin: 0 0 8px;
+  letter-spacing: -0.02em;
+}
+
+.rollout-card__desc {
+  color: var(--text-subdued);
+  font-size: 14px;
+  line-height: 1.55;
+  margin: 0 0 16px;
+  max-width: 560px;
+}
+
+.metrics-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.metric-target {
+  background: rgba(0,0,0,0.25);
+  border-radius: var(--radius-md);
+  padding: 12px;
+  text-align: center;
+}
+
+.metric-target__val {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--green);
+}
+
+.metric-target__label {
+  display: block;
+  font-size: 11px;
+  color: var(--text-subdued);
+  margin-top: 4px;
+}
+
+.chip--context {
+  border: 1px solid rgba(30,215,96,0.25);
+}
+
 /* ── Stats row ── */
 .stats-row {
   display: grid;
@@ -1619,6 +1689,10 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   }
 
   .insight-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .metrics-row {
     grid-template-columns: 1fr;
   }
 

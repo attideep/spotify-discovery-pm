@@ -19,10 +19,15 @@ class Settings(BaseSettings):
     data_dir: str = "data"
     corpus_path: str = "data/corpus.json"
     allow_demo_mode: bool = True
+    rate_limit_per_minute: int = 30
 
     @property
     def spotify_configured(self) -> bool:
         return bool(self.spotify_client_id and self.spotify_client_secret)
+
+    @property
+    def persistence_enabled(self) -> bool:
+        return bool(self.database_url.strip())
 
 
 @lru_cache

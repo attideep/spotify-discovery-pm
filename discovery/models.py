@@ -72,3 +72,4 @@ class BridgeSession(BaseModel):
     intent: str
     tracks: list[BridgeTrack]
     session_summary: str
+    planner: str = "heuristic"

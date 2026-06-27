@@ -81,53 +81,75 @@ def _gather_candidates(client: SpotifyClient | None, anchor: dict, intent: str) 
     return _dedupe_candidates(pool, {anchor["id"]}, anchor)
 
 
+def _listen_context_hint(intent: str) -> str:
+    low = intent.lower()
+    if any(w in low for w in ("commute", "drive", "driving", "car", "transit")):
+        return "Context: commute — steady energy, familiar-to-novel arc, minimal jarring transitions."
+    if any(w in low for w in ("run", "gym", "workout", "energy", "upbeat")):
+        return "Context: active listening — higher tempo and momentum as novelty increases."
+    if any(w in low for w in ("focus", "work", "study", "deep")):
+        return "Context: focus — smoother textures, avoid chaotic drops early in the bridge."
+    if any(w in low for w in ("wind down", "sleep", "calm", "evening", "chill")):
+        return "Context: wind-down — gradual softening, lower intensity toward the end."
+    return "Context: general discovery — gradual novelty from anchor toward intent."
+
+
 def _plan_with_llm(
     anchor: dict,
     candidates: list[dict],
     intent: str,
-) -> list[dict]:
+) -> tuple[list[dict], str]:
     settings = get_settings()
     if not settings.anthropic_api_key:
-        return _plan_heuristic(anchor, candidates, intent)
+        return _plan_heuristic(anchor, candidates, intent), "heuristic"
 
     import anthropic
 
+    valid_ids = {c["id"] for c in candidates}
     catalog = [
-        {
-            "id": c["id"],
-            "name": c["name"],
-            "artist": c["artist"],
-        }
+        {"id": c["id"], "name": c["name"], "artist": c["artist"]}
         for c in candidates[:40]
     ]
-    prompt = f"""You are Bridge Sessions — an AI music discovery agent for Spotify.
+    context = _listen_context_hint(intent)
+    prompt = f"""You are Bridge Sessions — a Spotify discovery agent.
 
-Build an 8-track listening bridge from ANCHOR toward novel music matching the user's intent.
+Build an 8-track listening bridge from ANCHOR toward music matching the user's intent.
 Pick exactly 8 track IDs from CATALOG only (never invent IDs).
-Order tracks by gradual novelty (low → high). Anchor is step 0 context, not in the 8.
+Order tracks by gradual novelty (low → high). Anchor is step 0 — do not include it.
 
 ANCHOR: {anchor["name"]} by {anchor["artist"]} (id: {anchor["id"]})
 INTENT: {intent}
+{context}
+
+Rules:
+- Step 1 should feel closest to the anchor; step 8 is the most novel yet still connected.
+- Each explanation is one concrete sentence about why THIS track follows the previous step.
+- novelty_score: 0.1 (familiar) → 0.9 (novel).
 
 CATALOG:
 {json.dumps(catalog, indent=2)}
 
 Return JSON only:
-{{"tracks": [{{"id": "...", "explanation": "one sentence why this transition works", "novelty_score": 0.0-1.0}}]}}
-Must be exactly 8 tracks, all IDs from catalog."""
+{{"tracks": [{{"id": "...", "explanation": "...", "novelty_score": 0.0-1.0}}]}}"""
 
     client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
-    msg = client.messages.create(
-        model="claude-3-5-haiku-20241022",
-        max_tokens=1200,
-        messages=[{"role": "user", "content": prompt}],
-    )
-    raw = msg.content[0].text
     try:
+        msg = client.messages.create(
+            model="claude-3-5-haiku-20241022",
+            max_tokens=1400,
+            messages=[{"role": "user", "content": prompt}],
+        )
+        raw = msg.content[0].text
         data = json.loads(re.search(r"\{.*\}", raw, re.S).group())
-        return data.get("tracks", [])
+        plan = [
+            t for t in data.get("tracks", [])
+            if t.get("id") in valid_ids
+        ]
+        if len(plan) >= 8:
+            return plan[:8], "claude"
     except Exception:
-        return _plan_heuristic(anchor, candidates, intent)
+        pass
+    return _plan_heuristic(anchor, candidates, intent), "heuristic"
 
 
 def _plan_heuristic(anchor: dict, candidates: list[dict], intent: str) -> list[dict]:
@@ -231,6 +253,7 @@ def _build_session(
     candidates: list[dict],
     intent: str,
     mode: str,
+    planner: str = "heuristic",
 ) -> BridgeSession:
     by_id = {c["id"]: c for c in candidates}
     by_id[anchor["id"]] = enrich_track_meta(anchor)
@@ -255,11 +278,16 @@ def _build_session(
     if len(tracks) < 8:
         raise BridgeError("Could not build 8-track bridge — try a different anchor or intent.", "insufficient_tracks")
 
-    summary = (
-        f"Live bridge from {anchor['name']} — 8 tracks with AI-planned transitions."
-        if mode == "live"
-        else "Free bridge using verified Spotify tracks — paste any public track link as your anchor."
-    )
+    if planner == "claude":
+        summary = (
+            f"AI-planned bridge from {anchor['name']} — each step explains the path toward your intent."
+        )
+    elif mode == "live":
+        summary = f"Live bridge from {anchor['name']} — 8 tracks with planned transitions."
+    else:
+        summary = (
+            f"Bridge from {anchor['name']} — 8 tracks sequenced from familiar to new."
+        )
     anchor_label = (
         f"{anchor['name']} — {anchor['artist']}"
         if anchor.get("artist")
@@ -271,6 +299,7 @@ def _build_session(
         intent=intent,
         tracks=tracks,
         session_summary=summary,
+        planner=planner,
     )
 
 
@@ -329,8 +358,8 @@ def create_bridge_session(
 
     anchor = resolve_anchor(client if mode == "live" else None, anchor_track_id)
     candidates = _gather_candidates(client if mode == "live" else None, anchor, intent)
-    plan = _plan_with_llm(anchor, candidates, intent)
-    session = _build_session(anchor, plan, candidates, intent, mode)
+    plan, planner = _plan_with_llm(anchor, candidates, intent)
+    session = _build_session(anchor, plan, candidates, intent, mode, planner)
     return session
 
 
@@ -379,6 +408,7 @@ def restore_bridge_session(
         intent=intent.strip(),
         tracks=tracks,
         session_summary="Shared bridge session — same track order as the link you opened.",
+        planner="shared",
     )
 
 
