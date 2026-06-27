@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Bridge" />
+  <link rel="apple-touch-icon" href="/static/icon.svg" />
   <title>Bridge Sessions — gradual music discovery</title>
   <meta name="description" content="Free 8-track listening bridges from a song you love toward something new. Each step explained. No login, 10k song catalog." />
   <meta name="theme-color" content="#1ed760" />
@@ -18,9 +23,9 @@
   <meta name="twitter:description" content="Gradual music discovery — 8 explained steps from your anchor track." />
   <meta name="twitter:image" content="https://spotify-discovery-pm.vercel.app/static/og.svg" />
   <style>
-    html,body{height:100%;width:100%;margin:0;background:#121212;color:#fff;overflow:hidden}
+    html,body{height:100%;width:100%;margin:0;background:#121212;color:#fff;overflow:hidden;touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
     .panel:not(.active){display:none!important}
-    .app{display:grid;grid-template-columns:1fr;grid-template-rows:1fr;height:100dvh;width:100%;min-height:100dvh;overflow:hidden}
+    .app{display:grid;grid-template-columns:1fr;grid-template-rows:1fr;height:var(--app-height,100dvh);width:100%;min-height:var(--app-height,100dvh);max-height:var(--app-height,100dvh);overflow:hidden}
     .app.app--has-player{grid-template-rows:1fr auto}
     @media (min-width:769px){.app{grid-template-columns:240px 1fr}}
   </style>

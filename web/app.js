@@ -986,7 +986,20 @@ document.getElementById("playerOpen")?.addEventListener("click", () => {
   }
 });
 
+function initMobileViewport() {
+  const sync = () => {
+    const h = window.visualViewport?.height ?? window.innerHeight;
+    document.documentElement.style.setProperty("--app-height", `${Math.round(h)}px`);
+  };
+  sync();
+  window.visualViewport?.addEventListener("resize", sync);
+  window.visualViewport?.addEventListener("scroll", sync);
+  window.addEventListener("resize", sync);
+  window.addEventListener("orientationchange", () => setTimeout(sync, 150));
+}
+
 async function boot() {
+  initMobileViewport();
   setGreeting();
   window.buildShareUrl = buildShareUrl;
   window.toast = toast;
