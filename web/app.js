@@ -187,7 +187,10 @@ async function fetchJSON(path, opts = {}) {
   const r = await fetch(`${API}${path}`, { ...FETCH_OPTS, ...opts });
   const data = await r.json().catch(() => ({}));
   if (!r.ok) {
-    const msg = data.error || data.detail || r.statusText;
+    let msg = data.error || data.detail || r.statusText;
+    if (r.status >= 500 && (!msg || msg === "Internal Server Error")) {
+      msg = "Server error — try again in a moment. Bridges still work in Smart match mode.";
+    }
     const err = new Error(msg);
     err.code = data.code;
     err.status = r.status;

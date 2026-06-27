@@ -27,8 +27,14 @@ class Settings(BaseSettings):
         return (self.gemini_api_key or self.google_api_key).strip()
 
     @property
+    def gemini_api_key_valid(self) -> bool:
+        """Google AI Studio keys start with AIza — other formats hang or 401."""
+        key = self.effective_gemini_key
+        return key.startswith("AIza") and len(key) >= 30
+
+    @property
     def bridge_planner_configured(self) -> bool:
-        return bool(self.effective_gemini_key)
+        return self.gemini_api_key_valid
 
     @property
     def spotify_configured(self) -> bool:

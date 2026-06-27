@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 from typing import Any
 
 from discovery.config import get_settings
@@ -132,19 +133,29 @@ CATALOG:
 Return JSON only:
 {{"tracks": [{{"id": "...", "explanation": "...", "novelty_score": 0.0-1.0}}]}}"""
 
-    try:
+    def _gemini_call() -> str:
         genai.configure(api_key=settings.effective_gemini_key)
         model = genai.GenerativeModel("gemini-2.0-flash")
-        response = model.generate_content(prompt)
-        raw = response.text or ""
-        data = json.loads(re.search(r"\{.*\}", raw, re.S).group())
+        response = model.generate_content(
+            prompt,
+            request_options={"timeout": 8},
+        )
+        return response.text or ""
+
+    try:
+        with ThreadPoolExecutor(max_workers=1) as pool:
+            raw = pool.submit(_gemini_call).result(timeout=8)
+        match = re.search(r"\{.*\}", raw, re.S)
+        if not match:
+            raise ValueError("no JSON in planner response")
+        data = json.loads(match.group())
         plan = [
             t for t in data.get("tracks", [])
             if t.get("id") in valid_ids
         ]
         if len(plan) >= 8:
             return plan[:8], "gemini"
-    except Exception:
+    except (FuturesTimeout, Exception):
         pass
     return _plan_heuristic(anchor, candidates, intent), "heuristic"
 
