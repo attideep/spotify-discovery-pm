@@ -1,6 +1,14 @@
 
 /* Customer app (/app) styles */
 
+.app--bridge-only .topbar--bridge-only {
+  padding: 10px 16px;
+}
+
+.app--bridge-only .content {
+  padding: 0 16px 28px;
+}
+
 .topbar__brand-icon {
   display: block;
   width: 28px;
@@ -39,6 +47,119 @@
 
 .chip--mood {
   font-size: 13px;
+}
+
+/* Truncated chips + tooltips */
+.chip--ellipsize {
+  position: relative;
+  max-width: min(100%, 280px);
+  overflow: visible;
+}
+
+.chip__label {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chip__tooltip {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  transform: translateX(-50%);
+  min-width: 180px;
+  max-width: min(320px, 90vw);
+  padding: 8px 12px;
+  background: #282828;
+  color: var(--text-base);
+  font-size: 12px;
+  line-height: 1.45;
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.15s ease, visibility 0.15s ease;
+  z-index: 30;
+  white-space: normal;
+  text-align: left;
+}
+
+.chip--ellipsize:hover .chip__tooltip,
+.chip--ellipsize:focus-visible .chip__tooltip,
+.chip--ellipsize.tooltip-open .chip__tooltip {
+  opacity: 1;
+  visibility: visible;
+}
+
+/* Session header (customer) */
+.session-head--customer {
+  margin-bottom: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.session-head__row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.session-head__title {
+  margin: 0;
+  font-size: clamp(18px, 3vw, 22px);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  flex: 1;
+  min-width: 0;
+  word-wrap: break-word;
+}
+
+.session-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.btn-spotify--outline {
+  background: transparent;
+  color: var(--text-base);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  padding: 8px 14px;
+  border-radius: var(--radius-pill);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.btn-spotify--outline:hover {
+  border-color: rgba(255, 255, 255, 0.45);
+  background: rgba(255, 255, 255, 0.06);
+  text-decoration: none;
+}
+
+.session-head--customer .session-summary {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-subdued);
+}
+
+.saved-bridge-card__badge {
+  display: inline-block;
+  margin-bottom: 6px;
+  padding: 2px 8px;
+  font-size: 9px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--green);
+  background: rgba(30, 215, 96, 0.12);
+  border-radius: var(--radius-pill);
 }
 
 
@@ -622,20 +743,12 @@
     display: none;
   }
 
-  .app--bridge-only.app--has-player #sessionBlock .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 6px;
+  .app--bridge-only.app--has-player .session-head__title {
+    font-size: 17px;
   }
 
-  .app--bridge-only.app--has-player #sessionTitle {
-    font-size: 18px;
-    line-height: 1.25;
-  }
-
-  .app--bridge-only.app--has-player .session-summary {
-    font-size: 13px;
-    margin-bottom: 12px;
+  .app--bridge-only.app--has-player .session-head--customer .session-summary {
+    font-size: 12px;
   }
 
   .app--bridge-only.app--has-player .bridge-stats__grid {
@@ -661,24 +774,29 @@
   }
 
   .app--bridge-only.app--has-player .bridge-player__row {
-    flex-wrap: nowrap;
-    gap: 8px;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
   }
 
   .app--bridge-only.app--has-player .bridge-player__volume {
-    display: none;
+    display: flex;
+    flex: 1 1 140px;
+    min-width: 120px;
+    max-width: 200px;
+  }
+
+  .app--bridge-only.app--has-player .bridge-player__volume input[type="range"] {
+    width: 72px;
   }
 
   .app--bridge-only.app--has-player .bridge-player__actions {
-    margin-left: 0;
+    margin-left: auto;
     flex-shrink: 0;
   }
 
-  .app--bridge-only.app--has-player .track-list-header {
-    grid-template-columns: 22px minmax(0, 1fr) 40px;
-    gap: 8px;
-    padding: 8px;
-    font-size: 10px;
+  .app--bridge-only.app--has-player #sessionBlock .section-header {
+    display: none;
   }
 }
 
@@ -712,6 +830,74 @@
 }
 
 @media (max-width: 768px) {
+  .app--bridge-only .topbar--bridge-only {
+    padding: 10px 12px;
+  }
+
+  .app--bridge-only .content {
+    padding: 0 12px 20px;
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0));
+  }
+
+  .session-head__row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .session-toolbar {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .session-toolbar .btn-spotify--sm {
+    flex: 1;
+    justify-content: center;
+  }
+
+  .bridge-player--minimal .bridge-player__row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-rows: auto auto auto;
+    gap: 10px 12px;
+    align-items: center;
+  }
+
+  .bridge-player--minimal .bridge-player__art {
+    grid-row: 1 / 3;
+  }
+
+  .bridge-player--minimal .bridge-player__meta {
+    grid-column: 2;
+    min-width: 0;
+  }
+
+  .bridge-player--minimal .bridge-player__controls {
+    grid-column: 2;
+    justify-content: flex-start;
+  }
+
+  .bridge-player--minimal .bridge-player__volume {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: none;
+  }
+
+  .bridge-player--minimal .bridge-player__volume input[type="range"] {
+    flex: 1;
+    width: auto;
+  }
+
+  .bridge-player--minimal .bridge-player__actions {
+    grid-column: 1 / -1;
+    margin-left: 0;
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .chip--ellipsize {
+    max-width: 100%;
+  }
+
   .topbar--bridge-only {
     flex-wrap: wrap;
   }

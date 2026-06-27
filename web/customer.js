@@ -11,8 +11,12 @@
     { emoji: "✨", label: "Surprise me", intent: "Controlled surprise — safe steps toward something new" },
   ];
 
+  const LOCAL_LIB_KEY = "bridge_local_library_v1";
+  const LOCAL_ID_PREFIX = "local:";
+
   let authUser = null;
   let sessionSaved = false;
+  let storageMode = "sqlite-ephemeral";
 
   function $(id) {
     return document.getElementById(id);
@@ -35,6 +39,100 @@
     }
   }
 
+  function getLocalLibrary() {
+    try {
+      const raw = localStorage.getItem(LOCAL_LIB_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
+  function setLocalLibrary(bridges) {
+    try {
+      localStorage.setItem(LOCAL_LIB_KEY, JSON.stringify(bridges.slice(0, 40)));
+    } catch { /* ignore */ }
+  }
+
+  function mirrorBridgeLocal(session, serverId) {
+    if (!session?.tracks?.length) return;
+    const id = serverId ? String(serverId) : `${LOCAL_ID_PREFIX}${Date.now()}`;
+    const entry = {
+      id,
+      title: `Bridge from ${session.anchor_track || "your anchor"}`.slice(0, 120),
+      intent: session.intent || "",
+      anchor_track: session.anchor_track || "",
+      anchor_id: session.anchor_id || "",
+      session_summary: session.session_summary || "",
+      tracks: session.tracks,
+      created_at: new Date().toISOString(),
+      _local: true,
+    };
+    const lib = getLocalLibrary().filter(b => b.id !== id);
+    lib.unshift(entry);
+    setLocalLibrary(lib);
+  }
+
+  function removeLocalBridge(id) {
+    setLocalLibrary(getLocalLibrary().filter(b => b.id !== id));
+  }
+
+  function mergeLibraries(serverBridges, localBridges) {
+    const byId = new Map();
+    for (const b of localBridges) byId.set(b.id, b);
+    for (const b of serverBridges) byId.set(b.id, { ...b, _local: false });
+    return [...byId.values()].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
+  }
+
+  function renderStorageNote(mode) {
+    const note = $("libraryStorageNote");
+    if (!note) return;
+    if (mode === "postgres") {
+      note.textContent = "Saved bridges — synced to your account across devices.";
+      return;
+    }
+    note.textContent = "Saved bridges — also kept in this browser if the server resets.";
+  }
+
+  function renderLibraryCards(el, bridges, app) {
+    if (!bridges.length) {
+      el.innerHTML = `
+        <div class="library-empty">
+          <p class="library-empty__title">No saved bridges yet</p>
+          <p class="library-empty__sub">Generate a bridge, then tap <strong>Save bridge</strong> to keep it here.</p>
+        </div>`;
+      return;
+    }
+    el.innerHTML = `
+      <div class="saved-bridges__scroll">
+        ${bridges.map(b => {
+          const trackCount = (b.tracks || []).length;
+          const date = formatBridgeDate(b.created_at);
+          const intent = b.intent || "";
+          const localBadge = b._local && storageMode !== "postgres" ? '<span class="saved-bridge-card__badge">This device</span>' : "";
+          return `
+          <div class="saved-bridge-card" data-id="${escapeHtml(b.id)}">
+            <button type="button" class="saved-bridge-card__open" data-id="${escapeHtml(b.id)}" title="${escapeHtml(b.title || b.anchor_track)}" aria-label="${escapeHtml(b.title || b.anchor_track)}">
+              ${localBadge}
+              <span class="saved-bridge-card__title">${escapeHtml(b.title || b.anchor_track)}</span>
+              <span class="saved-bridge-card__meta" title="${escapeHtml(intent)}">${escapeHtml(intent.slice(0, 56))}${intent.length > 56 ? "…" : ""}</span>
+              <span class="saved-bridge-card__foot">${trackCount ? `${trackCount} tracks` : "8 tracks"}${date ? ` · ${date}` : ""}</span>
+            </button>
+            <button type="button" class="saved-bridge-card__delete" data-delete="${escapeHtml(b.id)}" aria-label="Delete saved bridge">×</button>
+          </div>`;
+        }).join("")}
+      </div>`;
+    el.querySelectorAll(".saved-bridge-card__open").forEach(btn => {
+      btn.addEventListener("click", () => app.openSavedBridge(btn.dataset.id));
+    });
+    el.querySelectorAll("[data-delete]").forEach(btn => {
+      btn.addEventListener("click", e => {
+        e.stopPropagation();
+        app.deleteSavedBridge(btn.dataset.delete, btn.closest(".saved-bridge-card"));
+      });
+    });
+  }
+
   let bound = false;
 
   window.CustomerApp = {
@@ -44,10 +142,12 @@
       try {
         const data = await fetch("/api/auth/user/status", { credentials: "include" }).then(r => r.json());
         if (data.session_lost) {
-          window.toast?.("Your sign-in expired on this server — please sign in again.");
+          window.toast?.("Please sign in again — your library is still saved in this browser.");
         }
+        storageMode = data.storage || storageMode;
         authUser = data.user || null;
         this._renderAuthUI(data);
+        renderStorageNote(storageMode);
         if (authUser) {
           await this.loadSavedBridges();
           try {
@@ -89,11 +189,18 @@
       } else {
         signedOut.classList.remove("hidden");
         signedIn.classList.add("hidden");
-        libraryPanel?.classList.add("hidden");
-        libraryHint?.classList.remove("hidden");
         libraryNav?.classList.add("hidden");
         if (saveBtn) saveBtn.classList.add("hidden");
-        $("savedBridges")?.replaceChildren();
+        const local = getLocalLibrary();
+        if (local.length) {
+          libraryPanel?.classList.remove("hidden");
+          libraryHint?.classList.add("hidden");
+          this.loadSavedBridges();
+        } else {
+          libraryPanel?.classList.add("hidden");
+          libraryHint?.classList.remove("hidden");
+          $("savedBridges")?.replaceChildren();
+        }
       }
     },
 
@@ -231,6 +338,7 @@
           throw new Error("Could not save bridge — try again.");
         }
         if (!r.ok) throw new Error(data.detail || data.error || "Save failed");
+        mirrorBridgeLocal(window.lastSession, data.id);
         this.markSessionSaved();
         window.toast?.("Saved to your library");
         await this.loadSavedBridges();
@@ -242,7 +350,19 @@
     },
 
     async deleteSavedBridge(id, cardEl) {
-      if (!authUser || !id) return;
+      if (!id) return;
+      const isLocalOnly = id.startsWith(LOCAL_ID_PREFIX);
+      if (isLocalOnly) {
+        removeLocalBridge(id);
+        window.toast?.("Removed from library");
+        await this.loadSavedBridges();
+        return;
+      }
+      removeLocalBridge(id);
+      if (!authUser) {
+        await this.loadSavedBridges();
+        return;
+      }
       cardEl?.classList.add("saved-bridge-card--deleting");
       try {
         const r = await fetch(`/api/bridges/saved/${id}`, {
@@ -253,6 +373,7 @@
           const data = await r.json().catch(() => ({}));
           throw new Error(data.detail || "Could not delete");
         }
+        removeLocalBridge(id);
         window.toast?.("Removed from library");
         await this.loadSavedBridges();
       } catch (e) {
@@ -265,85 +386,79 @@
       const el = $("savedBridges");
       const panel = $("libraryPanel");
       const countEl = $("libraryCount");
-      if (!el || !authUser) {
+      const local = getLocalLibrary();
+      if (!el) return;
+      if (!authUser && !local.length) {
         panel?.classList.add("hidden");
         return;
       }
       panel?.classList.remove("hidden");
       el.innerHTML = `<div class="saved-bridges__loading"><span class="search-results__spinner"></span>Loading library…</div>`;
-      try {
-        const data = await fetch("/api/bridges/saved", { credentials: "include" }).then(r => r.json());
-        const bridges = data.bridges || [];
-        if (countEl) countEl.textContent = bridges.length ? String(bridges.length) : "";
-        if (!bridges.length) {
-          el.innerHTML = `
-            <div class="library-empty">
-              <p class="library-empty__title">No saved bridges yet</p>
-              <p class="library-empty__sub">Generate a bridge, then tap <strong>Save bridge</strong> to keep it here.</p>
-            </div>`;
-          return;
-        }
-        el.innerHTML = `
-          <div class="saved-bridges__scroll">
-            ${bridges.map(b => {
-              const trackCount = (b.tracks || []).length;
-              const date = formatBridgeDate(b.created_at);
-              return `
-              <div class="saved-bridge-card" data-id="${escapeHtml(b.id)}">
-                <button type="button" class="saved-bridge-card__open" data-id="${escapeHtml(b.id)}">
-                  <span class="saved-bridge-card__title">${escapeHtml(b.title || b.anchor_track)}</span>
-                  <span class="saved-bridge-card__meta">${escapeHtml((b.intent || "").slice(0, 56))}${(b.intent || "").length > 56 ? "…" : ""}</span>
-                  <span class="saved-bridge-card__foot">${trackCount ? `${trackCount} tracks` : "8 tracks"}${date ? ` · ${date}` : ""}</span>
-                </button>
-                <button type="button" class="saved-bridge-card__delete" data-delete="${escapeHtml(b.id)}" aria-label="Delete saved bridge">×</button>
-              </div>`;
-            }).join("")}
-          </div>`;
-        el.querySelectorAll(".saved-bridge-card__open").forEach(btn => {
-          btn.addEventListener("click", () => this.openSavedBridge(btn.dataset.id));
-        });
-        el.querySelectorAll("[data-delete]").forEach(btn => {
-          btn.addEventListener("click", e => {
-            e.stopPropagation();
-            this.deleteSavedBridge(btn.dataset.delete, btn.closest(".saved-bridge-card"));
-          });
-        });
-      } catch {
-        el.innerHTML = `
-          <div class="library-empty">
-            <p class="library-empty__title">Could not load library</p>
-            <p class="library-empty__sub">Check your connection and try again.</p>
-          </div>`;
+      let serverBridges = [];
+      if (authUser) {
+        try {
+          const data = await fetch("/api/bridges/saved", { credentials: "include" }).then(r => r.json());
+          serverBridges = data.bridges || [];
+        } catch { /* fall back to local */ }
       }
+      const bridges = storageMode === "postgres"
+        ? serverBridges
+        : mergeLibraries(serverBridges, local);
+      if (countEl) countEl.textContent = bridges.length ? String(bridges.length) : "";
+      renderLibraryCards(el, bridges, this);
     },
 
     async openSavedBridge(id) {
       if (!id) return;
-      try {
-        const bridge = await fetch(`/api/bridges/saved/${id}`, { credentials: "include" }).then(r => r.json());
+      const localBridge = getLocalLibrary().find(b => b.id === id);
+      if (authUser && !id.startsWith(LOCAL_ID_PREFIX)) {
+        try {
+          const bridge = await fetch(`/api/bridges/saved/${id}`, { credentials: "include" }).then(r => r.json());
+          const session = {
+            anchor_track: bridge.anchor_track,
+            anchor_id: bridge.anchor_id,
+            intent: bridge.intent,
+            session_summary: bridge.session_summary,
+            mode: "demo",
+            tracks: bridge.tracks,
+          };
+          window.displaySession?.(session);
+          this.markSessionSaved();
+          window.toast?.("Bridge loaded from library");
+          $("sessionBlock")?.scrollIntoView({ behavior: "smooth", block: "start" });
+          return;
+        } catch { /* try local */ }
+      }
+      if (localBridge?.tracks?.length) {
         const session = {
-          anchor_track: bridge.anchor_track,
-          anchor_id: bridge.anchor_id,
-          intent: bridge.intent,
-          session_summary: bridge.session_summary,
+          anchor_track: localBridge.anchor_track,
+          anchor_id: localBridge.anchor_id,
+          intent: localBridge.intent,
+          session_summary: localBridge.session_summary,
           mode: "demo",
-          tracks: bridge.tracks,
+          tracks: localBridge.tracks,
         };
         window.displaySession?.(session);
         this.markSessionSaved();
         window.toast?.("Bridge loaded from library");
         $("sessionBlock")?.scrollIntoView({ behavior: "smooth", block: "start" });
-      } catch {
-        window.toast?.("Could not open saved bridge");
+        return;
       }
+      window.toast?.("Could not open saved bridge");
     },
 
     renderMoodChips() {
       const el = $("moodChips");
       if (!el) return;
-      el.innerHTML = MOODS.map(m =>
-        `<button type="button" class="chip chip--mood" data-intent="${escapeHtml(m.intent)}">${m.emoji} ${m.label}</button>`
-      ).join("");
+      if (typeof chipButton === "function") {
+        el.innerHTML = MOODS.map(m =>
+          chipButton(`${m.emoji} ${m.label}`, { tip: m.intent, className: "chip chip--mood", attrs: { intent: m.intent } })
+        ).join("");
+      } else {
+        el.innerHTML = MOODS.map(m =>
+          `<button type="button" class="chip chip--mood" data-intent="${escapeHtml(m.intent)}" title="${escapeHtml(m.intent)}">${m.emoji} ${m.label}</button>`
+        ).join("");
+      }
       el.querySelectorAll(".chip--mood").forEach(btn => {
         btn.addEventListener("click", () => {
           const input = $("intentInput");
@@ -351,6 +466,7 @@
           input?.focus();
         });
       });
+      if (typeof bindChipTooltips === "function") bindChipTooltips(el);
     },
 
     renderContinueCard() {

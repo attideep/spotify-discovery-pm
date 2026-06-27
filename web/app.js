@@ -343,11 +343,56 @@ function switchTab(tab, { preserveQuery = false } = {}) {
   history.replaceState(null, "", `/#${tab}${query}`);
 }
 
+function escapeHtml(text) {
+  return String(text)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function chipLabel(text, max = 36) {
+  const s = String(text || "");
+  return s.length > max ? `${s.slice(0, max)}…` : s;
+}
+
+function chipButton(label, { tip, className = "chip", attrs = {} } = {}) {
+  const full = tip || label;
+  const attrStr = Object.entries(attrs)
+    .map(([k, v]) => ` data-${k}="${escapeHtml(v)}"`)
+    .join("");
+  return `<button type="button" class="${className} chip--ellipsize"${attrStr} title="${escapeHtml(full)}" aria-label="${escapeHtml(full)}"><span class="chip__label">${escapeHtml(chipLabel(label))}</span><span class="chip__tooltip" role="tooltip">${escapeHtml(full)}</span></button>`;
+}
+
+function bindChipTooltips(root = document) {
+  root.querySelectorAll(".chip--ellipsize").forEach(chip => {
+    if (chip.dataset.tipBound) return;
+    chip.dataset.tipBound = "1";
+    chip.addEventListener("click", () => {
+      root.querySelectorAll(".chip--ellipsize.tooltip-open").forEach(c => {
+        if (c !== chip) c.classList.remove("tooltip-open");
+      });
+    });
+    chip.addEventListener("touchstart", () => {
+      chip.classList.toggle("tooltip-open");
+    }, { passive: true });
+    chip.addEventListener("blur", () => chip.classList.remove("tooltip-open"));
+  });
+  if (!document.body.dataset.chipTipDismiss) {
+    document.body.dataset.chipTipDismiss = "1";
+    document.addEventListener("click", e => {
+      if (!e.target.closest(".chip--ellipsize")) {
+        document.querySelectorAll(".chip--ellipsize.tooltip-open").forEach(c => c.classList.remove("tooltip-open"));
+      }
+    });
+  }
+}
+
 function initExampleChips() {
   const anchorEl = document.getElementById("anchorChips");
   if (!anchorEl) return;
   anchorEl.innerHTML = EXAMPLE_ANCHORS.map(a =>
-    `<button type="button" class="chip" data-anchor="${a.url}">${a.label}</button>`
+    chipButton(a.label, { tip: a.label, attrs: { anchor: a.url } })
   ).join("");
   anchorEl.querySelectorAll(".chip").forEach(btn => {
     btn.addEventListener("click", () => {
@@ -358,19 +403,19 @@ function initExampleChips() {
 
   const intentEl = document.getElementById("intentChips");
   if (!intentEl) return;
-  intentEl.innerHTML = EXAMPLE_INTENTS.map(() => `<button type="button" class="chip"></button>`).join("");
+  intentEl.innerHTML = EXAMPLE_INTENTS.map(text =>
+    chipButton(text, { tip: text })
+  ).join("");
   intentEl.querySelectorAll(".chip").forEach((btn, i) => {
-    const text = EXAMPLE_INTENTS[i];
-    btn.textContent = text.length > 36 ? text.slice(0, 36) + "…" : text;
     btn.addEventListener("click", () => {
-      document.getElementById("intentInput").value = text;
+      document.getElementById("intentInput").value = EXAMPLE_INTENTS[i];
     });
   });
 
   const contextEl = document.getElementById("contextChips");
   if (contextEl) {
     contextEl.innerHTML = CONTEXT_INTENTS.map(c =>
-      `<button type="button" class="chip chip--context">${c.label}</button>`
+      chipButton(c.label, { tip: c.text, className: "chip chip--context" })
     ).join("");
     contextEl.querySelectorAll(".chip").forEach((btn, i) => {
       btn.addEventListener("click", () => {
@@ -378,6 +423,7 @@ function initExampleChips() {
       });
     });
   }
+  bindChipTooltips(anchorEl.parentElement || document);
 }
 
 document.querySelectorAll(".nav-item, .media-card, [data-tab]").forEach(el => {
@@ -678,14 +724,6 @@ function renderSegments(segments) {
       document.getElementById("themeDetail")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     });
   });
-}
-
-function escapeHtml(text) {
-  return String(text)
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
 }
 
 function renderAnswer(data) {

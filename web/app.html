@@ -62,7 +62,7 @@
 
           <div id="libraryHint" class="library-hint">
             <p class="library-hint__text">Sign in to save bridges and pick them up on any device.</p>
-            <button type="button" class="btn-spotify btn-spotify--green btn-spotify--sm" id="libraryHintSignIn">Sign in free</button>
+            <button type="button" class="btn-spotify btn-spotify--green btn-spotify--sm" id="libraryHintSignIn">Sign in</button>
           </div>
 
           <section id="libraryPanel" class="library-panel hidden" aria-labelledby="libraryPanelTitle">
@@ -70,12 +70,12 @@
               <h2 id="libraryPanelTitle" class="library-panel__title">Your library</h2>
               <span class="library-panel__count" id="libraryCount"></span>
             </div>
-            <p class="library-panel__sub">Saved bridges — tap to resume, or delete ones you no longer need.</p>
+            <p class="library-panel__sub" id="libraryStorageNote">Saved bridges — tap to resume, or delete ones you no longer need.</p>
             <div id="savedBridges" class="saved-bridges" aria-label="Saved bridges"></div>
           </section>
 
           <div id="sessionLostBanner" class="session-lost-banner hidden" role="status">
-            <p class="session-lost-banner__text">You were signed out — this host resets accounts between visits until persistent storage is enabled. Sign in again to restore your library.</p>
+            <p class="session-lost-banner__text">Your session ended — sign in again to open your library. Saved bridges on this device are still kept in your browser.</p>
             <button type="button" class="btn-spotify btn-spotify--green btn-spotify--sm" id="sessionLostSignIn">Sign in</button>
           </div>
 
@@ -125,14 +125,16 @@
           </div>
 
           <div id="sessionBlock" class="session-block hidden">
-            <div class="section-header">
-              <h2 id="sessionTitle">Your bridge</h2>
-              <div class="session-header-actions">
-                <button type="button" id="saveBridgeBtn" class="btn-spotify btn-spotify--green btn-spotify--sm hidden">Save bridge</button>
-                <button type="button" id="shareBridgeBtn" class="btn-spotify btn-spotify--ghost btn-spotify--sm hidden">Share</button>
+            <div class="session-head session-head--customer">
+              <div class="session-head__row">
+                <h2 id="sessionTitle" class="session-head__title">Your bridge</h2>
+                <div class="session-toolbar">
+                  <button type="button" id="saveBridgeBtn" class="btn-spotify btn-spotify--green btn-spotify--sm hidden">Save bridge</button>
+                  <button type="button" id="shareBridgeBtn" class="btn-spotify btn-spotify--outline btn-spotify--sm hidden">Share</button>
+                </div>
               </div>
+              <p id="sessionSummary" class="session-summary"></p>
             </div>
-            <p id="sessionSummary" class="session-summary"></p>
             <div id="bridgeStats" class="bridge-stats hidden"></div>
             <div id="noveltyJourney" class="novelty-journey hidden"></div>
             <div class="track-list-header">
