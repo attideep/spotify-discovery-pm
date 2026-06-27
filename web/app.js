@@ -1,5 +1,6 @@
 const API = window.API_BASE || "";
 const FETCH_OPTS = { credentials: "include" };
+const BRIDGE_ONLY = window.APP_VARIANT === "bridge-only";
 
 const EXAMPLE_ANCHORS = [
   { label: "Holocene · Bon Iver", url: "https://open.spotify.com/track/35KiiILklye1JRRctaLUb4" },
@@ -41,6 +42,14 @@ function setGreeting() {
 }
 
 function parseHashState() {
+  if (BRIDGE_ONLY) {
+    const hashQuery = location.hash.includes("?")
+      ? location.hash.slice(location.hash.indexOf("?") + 1)
+      : "";
+    const searchQuery = location.search.replace(/^\?/, "");
+    const params = new URLSearchParams(hashQuery || searchQuery);
+    return { tab: "bridge", params };
+  }
   const raw = location.hash.replace("#", "");
   const [tabPart, queryPart] = raw.split("?");
   const tab = tabPart || (location.pathname.includes("bridge") ? "bridge" : "home");
@@ -62,6 +71,9 @@ function buildShareUrl(session) {
   if (anchorId) qs.set("anchor", anchorId);
   const ids = (session.tracks || []).map(t => t.track_id).filter(Boolean);
   if (ids.length) qs.set("tracks", ids.join(","));
+  if (BRIDGE_ONLY) {
+    return `${location.origin}/app#?${qs.toString()}`;
+  }
   return `${location.origin}/#bridge?${qs.toString()}`;
 }
 
@@ -293,6 +305,15 @@ let activeTheme = null;
 let activeSegment = null;
 
 function switchTab(tab, { preserveQuery = false } = {}) {
+  if (BRIDGE_ONLY) {
+    if (tab !== "bridge") return;
+    document.getElementById("mainArea").dataset.accent = "bridge";
+    if (!preserveQuery) {
+      history.replaceState(null, "", "/app");
+    }
+    return;
+  }
+
   document.querySelectorAll(".nav-item").forEach(n => {
     n.classList.toggle("active", n.dataset.tab === tab);
   });
@@ -350,6 +371,7 @@ function initExampleChips() {
 document.querySelectorAll(".nav-item, .media-card, [data-tab]").forEach(el => {
   el.addEventListener("click", e => {
     const tab = el.dataset.tab;
+    if (!tab || (BRIDGE_ONLY && tab !== "bridge")) return;
     if (tab) {
       e.preventDefault();
       switchTab(tab);
@@ -358,7 +380,9 @@ document.querySelectorAll(".nav-item, .media-card, [data-tab]").forEach(el => {
 });
 
 const INITIAL_HASH = parseHashState();
-if (["home", "bridge", "insights", "ask"].includes(INITIAL_HASH.tab)) {
+if (BRIDGE_ONLY) {
+  switchTab("bridge", { preserveQuery: true });
+} else if (["home", "bridge", "insights", "ask"].includes(INITIAL_HASH.tab)) {
   const hasShareQuery = Boolean(
     INITIAL_HASH.params.get("share")
     || INITIAL_HASH.params.get("intent")
@@ -727,6 +751,14 @@ function renderSearchResults(data) {
   el.innerHTML = renderSearchResultsHtml(tracks, data.hint);
   el.classList.remove("hidden");
   bindSearchResultClicks(el, btn => {
+    if (BRIDGE_ONLY) {
+      document.getElementById("anchorInput").value = btn.dataset.url;
+      previewAnchor();
+      hideSearchResults();
+      document.getElementById("globalSearch").value = "";
+      toast("Anchor track set — add intent and generate");
+      return;
+    }
     switchTab("bridge");
     document.getElementById("anchorInput").value = btn.dataset.url;
     previewAnchor();
@@ -767,7 +799,7 @@ document.getElementById("globalSearch")?.addEventListener("keydown", async e => 
   clearTimeout(globalSearchTimer);
   const q = e.target.value.trim();
   if (!q) return;
-  if (q.startsWith("?")) {
+  if (!BRIDGE_ONLY && q.startsWith("?")) {
     switchTab("ask");
     document.getElementById("questionInput").value = q.slice(1).trim();
     const resp = await fetchJSON("/api/ask", {
@@ -980,8 +1012,10 @@ document.getElementById("playerNext")?.addEventListener("click", () => {
 document.getElementById("playerOpen")?.addEventListener("click", () => {
   if (currentTracks.length && currentTracks[currentTrackIdx]?.spotify_url) {
     window.open(currentTracks[currentTrackIdx].spotify_url, "_blank");
-  } else {
+  } else if (!BRIDGE_ONLY) {
     switchTab("bridge");
+    toast("Generate a bridge session first");
+  } else {
     toast("Generate a bridge session first");
   }
 });
@@ -1010,7 +1044,9 @@ async function boot() {
   window.BridgeExtras?.bindShortcuts();
   initExampleChips();
   await tryLoadSharedBridge(INITIAL_HASH.params);
-  await loadInsights().catch(() => {});
+  if (!BRIDGE_ONLY) {
+    await loadInsights().catch(() => {});
+  }
   fetchJSON("/health").then(h => {
     const el = document.getElementById("catalogSizeLabel");
     if (el && h.chart_catalog_tracks) el.textContent = h.chart_catalog_tracks.toLocaleString();

@@ -68,6 +68,65 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   grid-template-rows: 1fr auto;
 }
 
+/* ── Customer bridge-only app (/app) ── */
+.app--bridge-only {
+  grid-template-columns: 1fr !important;
+}
+
+.app--bridge-only .main {
+  grid-column: 1;
+  min-width: 0;
+}
+
+.topbar--bridge-only {
+  gap: 12px;
+}
+
+.topbar__brand {
+  display: none;
+}
+
+.app--bridge-only .topbar__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.app--bridge-only .topbar__search {
+  flex: 1;
+  max-width: none;
+  margin: 0;
+}
+
+.bridge-hero--compact {
+  margin-bottom: 8px;
+}
+
+.bridge-hero--compact .bridge-hero__title {
+  font-size: clamp(26px, 5vw, 36px);
+}
+
+@media (max-width: 768px) {
+  .app--bridge-only {
+    grid-template-rows: 1fr;
+  }
+
+  .app--bridge-only.app--has-player {
+    grid-template-rows: 1fr auto;
+  }
+
+  .app--bridge-only .topbar--bridge-only {
+    flex-wrap: wrap;
+  }
+
+  .app--bridge-only .topbar__brand {
+    width: 100%;
+  }
+}
+
 /* ── Sidebar ── */
 .sidebar {
   grid-row: 1 / -1;
@@ -111,6 +170,24 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   background: var(--bg-elevated);
   border-radius: var(--radius-lg);
   padding: 4px;
+}
+
+.sidebar__customer-link {
+  display: block;
+  margin: 12px 8px 4px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-subdued);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  text-align: center;
+  transition: color var(--transition), border-color var(--transition);
+}
+
+.sidebar__customer-link:hover {
+  color: var(--green);
+  border-color: rgba(30, 215, 96, 0.35);
 }
 
 .nav-item {
@@ -1685,6 +1762,10 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 
   .sidebar__logo-text,
   .sidebar__badge {
+    display: none;
+  }
+
+  .sidebar__customer-link {
     display: none;
   }
 

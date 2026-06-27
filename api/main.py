@@ -443,8 +443,12 @@ if WEB_DIR.exists():
     def root() -> FileResponse:
         return FileResponse(WEB_DIR / "index.html")
 
+    @app.get("/app")
+    def customer_app() -> FileResponse:
+        return FileResponse(WEB_DIR / "app.html")
+
     @app.get("/bridge.html")
-    def bridge_page() -> FileResponse:
-        return FileResponse(WEB_DIR / "bridge.html")
+    def bridge_page() -> RedirectResponse:
+        return RedirectResponse(url="/app", status_code=302)
 
     app.mount("/static", StaticFiles(directory=str(WEB_DIR)), name="static")

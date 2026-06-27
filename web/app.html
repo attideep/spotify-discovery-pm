@@ -8,139 +8,47 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <meta name="apple-mobile-web-app-title" content="Bridge" />
   <link rel="apple-touch-icon" href="/static/icon.svg" />
-  <title>Bridge Sessions — gradual music discovery</title>
-  <meta name="description" content="Free 8-track listening bridges from a song you love toward something new. Each step explained. No login, 10k song catalog." />
+  <title>Bridge Sessions — discover music gradually</title>
+  <meta name="description" content="Free 8-track listening bridges from a song you love toward something new. Each step explained. No login." />
   <meta name="theme-color" content="#1ed760" />
   <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
-  <link rel="manifest" href="/static/manifest.json" />
+  <link rel="manifest" href="/static/manifest-app.json" />
   <meta property="og:type" content="website" />
-  <meta property="og:url" content="https://spotify-discovery-pm.vercel.app/" />
-  <meta property="og:title" content="Bridge Sessions — how is this free?" />
-  <meta property="og:description" content="8-track journeys from familiar → novel. Search any song, get explained transitions. No Spotify login." />
+  <meta property="og:url" content="https://spotify-discovery-pm.vercel.app/app" />
+  <meta property="og:title" content="Bridge Sessions" />
+  <meta property="og:description" content="8-track journeys from familiar → novel. Each step explained." />
   <meta property="og:image" content="https://spotify-discovery-pm.vercel.app/static/og.svg" />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Bridge Sessions" />
-  <meta name="twitter:description" content="Gradual music discovery — 8 explained steps from your anchor track." />
-  <meta name="twitter:image" content="https://spotify-discovery-pm.vercel.app/static/og.svg" />
   <style>
     html,body{height:100%;width:100%;margin:0;background:#121212;color:#fff;overflow:hidden;touch-action:manipulation;-webkit-text-size-adjust:100%;text-size-adjust:100%}
-    .panel:not(.active){display:none!important}
     .app{display:grid;grid-template-columns:1fr;grid-template-rows:1fr;height:var(--app-height,100dvh);width:100%;min-height:var(--app-height,100dvh);max-height:var(--app-height,100dvh);overflow:hidden}
     .app.app--has-player{grid-template-rows:1fr auto}
-    @media (min-width:769px){.app{grid-template-columns:240px 1fr}}
   </style>
   <link rel="stylesheet" href="/static/styles.css" />
   <link rel="stylesheet" href="/static/player.css" />
 </head>
 <body>
-  <div class="app">
-    <!-- Sidebar -->
-    <aside class="sidebar">
-      <div class="sidebar__logo">
-        <svg width="32" height="32" viewBox="0 0 24 24" fill="#1ed760"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-        <span class="sidebar__logo-text">Bridge</span>
-        <span class="sidebar__badge">Free</span>
-      </div>
-
-      <nav class="sidebar__nav">
-        <button class="nav-item active" data-tab="home">
-          <svg viewBox="0 0 24 24"><path d="M12.5 3.247a1 1 0 0 0-1 0L4 7.577V20h4.5v-8.5a1 1 0 0 1 1-1h5a1 1 0 0 1 1 1V20H20V7.577l-7.5-4.33z"/></svg>
-          <span>Home</span>
-        </button>
-        <button class="nav-item" data-tab="bridge">
-          <svg viewBox="0 0 24 24"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>
+  <div class="app app--bridge-only">
+    <div class="main" data-accent="bridge" id="mainArea">
+      <header class="topbar topbar--bridge-only">
+        <div class="topbar__brand">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="#1ed760" aria-hidden="true"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg>
           <span>Bridge Sessions</span>
-        </button>
-        <button class="nav-item" data-tab="insights">
-          <svg viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>
-          <span>Discovery Lab</span>
-        </button>
-        <button class="nav-item" data-tab="ask">
-          <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
-          <span>Ask Corpus</span>
-        </button>
-      </nav>
-
-      <a href="/app" class="sidebar__customer-link" target="_blank" rel="noopener">Customer view ↗</a>
-    </aside>
-
-    <!-- Main -->
-    <div class="main" data-accent="home" id="mainArea">
-      <header class="topbar">
-        <div class="topbar__nav-btns">
-          <button class="icon-btn" disabled aria-label="Back">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M9.7 3.3a1 1 0 0 0-1.4 1.4L10.6 7H3a1 1 0 1 0 0 2h7.6L8.3 11.3a1 1 0 1 0 1.4 1.4l4-4a1 1 0 0 0 0-1.4l-4-4z" transform="rotate(180 8 8)"/></svg>
-          </button>
-          <button class="icon-btn" disabled aria-label="Forward">
-            <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M9.7 3.3a1 1 0 0 0-1.4 1.4L10.6 7H3a1 1 0 1 0 0 2h7.6L8.3 11.3a1 1 0 1 0 1.4 1.4l4-4a1 1 0 0 0 0-1.4l-4-4z"/></svg>
-          </button>
+          <span class="sidebar__badge">Free</span>
         </div>
         <div class="topbar__search">
           <svg class="topbar__search-icon" width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M13.7 12.3 11 9.6a5.5 5.5 0 1 0-1.4 1.4l2.7 2.7a1 1 0 0 0 1.4-1.4zM6.5 10A3.5 3.5 0 1 1 10 6.5 3.5 3.5 0 0 1 6.5 10z"/></svg>
-          <input type="text" id="globalSearch" placeholder="Search songs or artists…" autocomplete="off" />
+          <input type="text" id="globalSearch" placeholder="Search songs to anchor…" autocomplete="off" />
           <div id="searchResults" class="search-results hidden" role="listbox"></div>
         </div>
-        <div class="topbar__user">A</div>
       </header>
 
       <div class="content">
-        <!-- HOME -->
-        <section class="panel active" id="panel-home">
-          <div class="public-banner">
-            <div class="public-banner__text">
-              <p class="public-banner__eyebrow">Free · No login · Unlimited</p>
-              <h2 class="public-banner__title">Discover music through gradual bridges — not random jumps</h2>
-              <p class="public-banner__desc">AI-planned 8-track journeys from a song you love toward something new. Search <span id="catalogSizeLabel">50,000+</span> tracks, explore listener insights, or ask what people really say about music discovery.</p>
-            </div>
-            <button type="button" class="btn-spotify btn-spotify--green public-banner__cta" data-tab="bridge">Start a bridge session</button>
-          </div>
-
-          <h1 class="greeting" id="greeting">Good evening</h1>
-          <div class="stats-row" id="statsRow">
-            <div class="stat-pill"><div class="stat-pill__value" id="statReviews">—</div><div class="stat-pill__label">Reviews analyzed</div></div>
-            <div class="stat-pill"><div class="stat-pill__value" id="statThemes">—</div><div class="stat-pill__label">Discovery themes</div></div>
-            <div class="stat-pill"><div class="stat-pill__value">8</div><div class="stat-pill__label">Tracks per bridge</div></div>
-          </div>
-
-          <div class="section-header"><h2>Made for your discovery journey</h2></div>
-          <div class="card-grid">
-            <article class="media-card" data-tab="bridge">
-              <div class="media-card__cover"><div class="cover-gradient" style="background:linear-gradient(135deg,#1ed760,#121212)">🌉</div>
-                <button class="media-card__play" aria-label="Open Bridge"><svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5v11l10-5.5L3 2.5z"/></svg></button>
-              </div>
-              <p class="media-card__title">Bridge Sessions</p>
-              <p class="media-card__desc">8-track journeys — paste any Spotify link as your anchor</p>
-            </article>
-            <article class="media-card" data-tab="insights">
-              <div class="media-card__cover"><div class="cover-gradient" style="background:linear-gradient(135deg,#509bf5,#121212)">📊</div>
-                <button class="media-card__play" aria-label="Open Insights"><svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5v11l10-5.5L3 2.5z"/></svg></button>
-              </div>
-              <p class="media-card__title">Discovery Lab</p>
-              <p class="media-card__desc">553+ user voices — themes, segments, pain points</p>
-            </article>
-            <article class="media-card" data-tab="ask">
-              <div class="media-card__cover"><div class="cover-gradient" style="background:linear-gradient(135deg,#e91429,#121212)">💬</div>
-                <button class="media-card__play" aria-label="Ask"><svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M3 2.5v11l10-5.5L3 2.5z"/></svg></button>
-              </div>
-              <p class="media-card__title">Ask the Corpus</p>
-              <p class="media-card__desc">RAG-powered answers with cited user quotes</p>
-            </article>
-          </div>
-
-          <div class="section-header"><h2>Recently analyzed</h2><a href="#" data-tab="insights">Show all</a></div>
-          <div class="card-grid" id="homeThemes"></div>
-        </section>
-
-        <!-- BRIDGE -->
-        <section class="panel" id="panel-bridge">
-          <div class="bridge-hero">
+        <section class="panel active" id="panel-bridge">
+          <div class="bridge-hero bridge-hero--compact">
             <div class="bridge-hero__content">
               <p class="bridge-hero__type">Free · No login</p>
-              <h1 class="bridge-hero__title">Bridge Sessions</h1>
-              <p class="bridge-hero__desc">A listening journey from a track you choose toward novel artists. Each step explains why the transition works — discovery that feels safe, not random.</p>
-              <div class="bridge-actions bridge-actions--primary">
-                <button type="button" id="startBridgeBtn" class="btn-spotify btn-spotify--green">Start a bridge</button>
-              </div>
+              <h1 class="bridge-hero__title">Discover music through gradual bridges</h1>
+              <p class="bridge-hero__desc">Pick a song you love. Get an 8-track journey toward something new — each step explained. <span id="catalogSizeLabel">50,000+</span> songs.</p>
             </div>
           </div>
 
@@ -190,33 +98,9 @@
             <div id="tracks"></div>
           </div>
         </section>
-
-        <!-- INSIGHTS -->
-        <section class="panel" id="panel-insights">
-          <h1 class="greeting" style="font-size:32px">Discovery Lab</h1>
-          <p id="insightSubtitle" style="color:var(--text-subdued);margin:-16px 0 24px">Insights from user reviews — click a theme or segment to explore</p>
-          <div id="themeDetail" class="theme-detail hidden"></div>
-          <div class="insight-grid">
-            <div><h3 style="font-size:16px;margin:0 0 16px">Themes</h3><div id="themes"></div></div>
-            <div><h3 style="font-size:16px;margin:0 0 16px">User segments</h3><div id="segments"></div></div>
-          </div>
-        </section>
-
-        <!-- ASK -->
-        <section class="panel ask-panel" id="panel-ask">
-          <h1 class="greeting" style="font-size:32px">Ask the corpus</h1>
-          <p style="color:var(--text-subdued);margin:-16px 0 8px">Six canonical growth questions — or ask your own</p>
-          <div id="canonicalBtns" class="chip-row"></div>
-          <div class="ask-form">
-            <input class="form-input" id="questionInput" type="text" placeholder="Why do users repeat the same playlists?" />
-            <button id="askBtn" class="btn-spotify btn-spotify--green">Ask</button>
-          </div>
-          <div id="answer" class="answer-box hidden"></div>
-        </section>
       </div>
     </div>
 
-    <!-- Custom bridge player — 30s previews via Web Audio (volume + EQ) -->
     <footer class="now-playing hidden" id="previewBar">
       <div class="bridge-player">
         <canvas id="eqCanvas" class="bridge-player__eq" aria-hidden="true"></canvas>
@@ -265,7 +149,6 @@
       <h2 id="termsTitle">Terms of use</h2>
       <p>Bridge Sessions is a free music discovery demo. It is not affiliated with Spotify AB.</p>
       <p>You use this app at your own risk. Bridges are suggestions only — always verify artists and content in Spotify.</p>
-      <p>Do not abuse the API (automated scraping, spam). We may rate-limit abusive traffic.</p>
       <button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="termsModal">Close</button>
     </div>
   </div>
@@ -274,7 +157,6 @@
       <h2>Privacy</h2>
       <p>We do not require accounts. Bridge events may be logged anonymously if analytics are enabled.</p>
       <p>Preview audio is matched via Apple Music/iTunes search and played in your browser.</p>
-      <p>Share links encode your intent and track IDs in the URL — only share if you're comfortable.</p>
       <button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="privacyModal">Close</button>
     </div>
   </div>
@@ -283,7 +165,6 @@
       <h2>About playback</h2>
       <p>Preview clips are ~30 seconds — music licensing limits free full streaming in the browser.</p>
       <p><strong>Full songs:</strong> Tap <em>Full song</em> to open the track in Spotify.</p>
-      <p><strong>Volume & EQ:</strong> Bass, mid, and treble adjust the preview in real time. The visualizer follows the actual audio.</p>
       <button type="button" class="btn-spotify btn-spotify--ghost" data-close-modal="playbackModal">Got it</button>
     </div>
   </div>
@@ -300,6 +181,8 @@
   </div>
 
   <div class="status-toast" id="statusToast"></div>
+
+  <script>window.APP_VARIANT = "bridge-only";</script>
   <script src="/static/player.js"></script>
   <script src="/static/legal.js"></script>
   <script src="/static/app.js"></script>
