@@ -210,6 +210,7 @@ function displaySession(session) {
   sessionBlock.scrollIntoView({ behavior: "smooth", block: "start" });
   window.BridgeExtras?.renderStats(session);
   window.BridgeExtras?.saveHistory(session);
+  window.CustomerApp?.onSessionDisplay?.(session);
 }
 
 window.displaySession = displaySession;
@@ -232,6 +233,7 @@ async function fetchJSON(path, opts = {}) {
 
 function toast(msg) {
   const el = document.getElementById("statusToast");
+  if (!el) return;
   el.textContent = msg;
   el.classList.add("visible");
   setTimeout(() => el.classList.remove("visible"), 2800);
@@ -239,12 +241,13 @@ function toast(msg) {
 
 function showBridgeError(msg) {
   const el = document.getElementById("bridgeError");
+  if (!el) return;
   el.textContent = msg;
   el.classList.remove("hidden");
 }
 
 function clearBridgeError() {
-  document.getElementById("bridgeError").classList.add("hidden");
+  document.getElementById("bridgeError")?.classList.add("hidden");
 }
 
 function setBridgeLoading(loading, message = "Building your bridge…", progress = null) {
@@ -342,6 +345,7 @@ function switchTab(tab, { preserveQuery = false } = {}) {
 
 function initExampleChips() {
   const anchorEl = document.getElementById("anchorChips");
+  if (!anchorEl) return;
   anchorEl.innerHTML = EXAMPLE_ANCHORS.map(a =>
     `<button type="button" class="chip" data-anchor="${a.url}">${a.label}</button>`
   ).join("");
@@ -353,6 +357,7 @@ function initExampleChips() {
   });
 
   const intentEl = document.getElementById("intentChips");
+  if (!intentEl) return;
   intentEl.innerHTML = EXAMPLE_INTENTS.map(() => `<button type="button" class="chip"></button>`).join("");
   intentEl.querySelectorAll(".chip").forEach((btn, i) => {
     const text = EXAMPLE_INTENTS[i];
@@ -888,6 +893,7 @@ async function updatePlayer(track, idx) {
   if (!track) {
     bar?.classList.add("hidden");
     app?.classList.remove("app--has-player");
+    updateBridgeArtPanel(null, idx);
     window.BridgePlayer?._stopEq?.();
     return;
   }
@@ -908,12 +914,56 @@ async function updatePlayer(track, idx) {
     artEl.style.background = GRADIENTS[idx % GRADIENTS.length];
     artEl.classList.remove("bridge-player__art--spin");
   }
+  updateBridgeArtPanel(track, idx);
   await window.BridgePlayer?.loadTrack(track);
+}
+
+function updateBridgeArtPanel(track, idx) {
+  if (!BRIDGE_ONLY) return;
+  const panel = document.getElementById("bridgeArtPanel");
+  if (!panel) return;
+  if (!track) {
+    panel.classList.add("hidden");
+    panel.setAttribute("aria-hidden", "true");
+    return;
+  }
+  panel.classList.remove("hidden");
+  panel.setAttribute("aria-hidden", "false");
+  const artEl = document.getElementById("bridgeArtHero");
+  const bgEl = document.getElementById("bridgeArtBg");
+  const titleEl = document.getElementById("bridgeArtTitle");
+  const artistEl = document.getElementById("bridgeArtArtist");
+  const stepEl = document.getElementById("bridgeArtStep");
+  const noteEl = document.getElementById("bridgeArtNote");
+  if (titleEl) titleEl.textContent = track.name;
+  if (artistEl) artistEl.textContent = track.artist;
+  if (stepEl) stepEl.textContent = `Track ${idx + 1} of ${currentTracks.length}`;
+  if (noteEl) noteEl.textContent = track.explanation || "";
+  if (artEl) {
+    if (track.album_art) {
+      artEl.style.background = "";
+      artEl.style.backgroundImage = `url("${track.album_art}")`;
+      artEl.classList.toggle("bridge-art-panel__art--spin", true);
+      if (bgEl) {
+        bgEl.style.backgroundImage = `url("${track.album_art}")`;
+        bgEl.classList.remove("hidden");
+      }
+    } else {
+      artEl.style.backgroundImage = "";
+      artEl.style.background = GRADIENTS[idx % GRADIENTS.length];
+      artEl.classList.remove("bridge-art-panel__art--spin");
+      if (bgEl) {
+        bgEl.style.backgroundImage = "";
+        bgEl.classList.add("hidden");
+      }
+    }
+  }
 }
 
 function renderTracks(tracks, { animate = false } = {}) {
   currentTracks = tracks;
   const container = document.getElementById("tracks");
+  if (!container) return;
   container.innerHTML = tracks.map((t, i) => `
     <div class="track-row${animate ? " track-row--reveal" : ""}${i === 0 ? " track-row--active" : ""}${BRIDGE_ONLY ? " track-row--customer" : ""}" data-idx="${i}" role="button" tabindex="0" style="${animate ? `animation-delay:${i * 0.07}s` : ""}">
       <span class="track-row__idx">${t.position}</span>

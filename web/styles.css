@@ -75,7 +75,34 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
 
 .app--bridge-only .main {
   grid-column: 1;
+  grid-row: 1;
   min-width: 0;
+}
+
+.app--bridge-only .now-playing {
+  grid-column: 1;
+}
+
+@media (min-width: 769px) {
+  .app--bridge-only.app--has-player {
+    grid-template-columns: minmax(400px, 520px) 1fr !important;
+  }
+
+  .app--bridge-only.app--has-player .main {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .app--bridge-only.app--has-player .bridge-art-panel:not(.hidden) {
+    grid-column: 2;
+    grid-row: 1 / 3;
+    display: flex;
+  }
+
+  .app--bridge-only.app--has-player .now-playing:not(.hidden) {
+    grid-column: 1;
+    grid-row: 2;
+  }
 }
 
 .topbar--bridge-only {

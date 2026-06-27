@@ -12,6 +12,7 @@
   ];
 
   let authUser = null;
+  let sessionSaved = false;
 
   function $(id) {
     return document.getElementById(id);
@@ -21,6 +22,17 @@
     if (!el) return;
     el.innerHTML = `<div class="search-results__loading"><span class="search-results__spinner"></span>${message}</div>`;
     el.classList.remove("hidden");
+  }
+
+  function formatBridgeDate(iso) {
+    if (!iso) return "";
+    try {
+      const d = new Date(iso);
+      if (Number.isNaN(d.getTime())) return "";
+      return d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+    } catch {
+      return "";
+    }
   }
 
   let bound = false;
@@ -34,9 +46,12 @@
         authUser = data.user || null;
         this._renderAuthUI(data);
         if (authUser) await this.loadSavedBridges();
+        else this._renderLibraryHint();
         return data;
       } catch {
+        authUser = null;
         this._renderAuthUI({ logged_in: false, user: null });
+        this._renderLibraryHint();
       }
     },
 
@@ -45,18 +60,60 @@
       const signedIn = $("authSignedIn");
       const nameEl = $("authUserName");
       const saveBtn = $("saveBridgeBtn");
+      const libraryPanel = $("libraryPanel");
+      const libraryHint = $("libraryHint");
+      const libraryNav = $("libraryNavBtn");
       if (!signedOut || !signedIn) return;
 
       if (status.logged_in && status.user) {
         signedOut.classList.add("hidden");
         signedIn.classList.remove("hidden");
+        libraryHint?.classList.add("hidden");
+        libraryPanel?.classList.remove("hidden");
+        libraryNav?.classList.remove("hidden");
         if (nameEl) nameEl.textContent = status.user.display_name || status.user.email;
         if (saveBtn) saveBtn.classList.remove("hidden");
       } else {
         signedOut.classList.remove("hidden");
         signedIn.classList.add("hidden");
+        libraryPanel?.classList.add("hidden");
+        libraryHint?.classList.remove("hidden");
+        libraryNav?.classList.add("hidden");
         if (saveBtn) saveBtn.classList.add("hidden");
+        $("savedBridges")?.replaceChildren();
       }
+    },
+
+    _renderLibraryHint() {
+      const hint = $("libraryHint");
+      if (!hint || authUser) return;
+      hint.classList.remove("hidden");
+    },
+
+    scrollToLibrary() {
+      $("libraryPanel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    },
+
+    resetSaveButton() {
+      sessionSaved = false;
+      const saveBtn = $("saveBridgeBtn");
+      if (!saveBtn) return;
+      saveBtn.textContent = "Save bridge";
+      saveBtn.classList.remove("btn-spotify--saved");
+      saveBtn.disabled = false;
+    },
+
+    markSessionSaved() {
+      sessionSaved = true;
+      const saveBtn = $("saveBridgeBtn");
+      if (!saveBtn) return;
+      saveBtn.textContent = "Saved ✓";
+      saveBtn.classList.add("btn-spotify--saved");
+      saveBtn.disabled = true;
+    },
+
+    onSessionDisplay() {
+      this.resetSaveButton();
     },
 
     openAuth(mode = "login") {
@@ -64,7 +121,7 @@
       $("authModalTitle").textContent = mode === "signup" ? "Create account" : "Sign in";
       $("authSubmitBtn").textContent = mode === "signup" ? "Sign up" : "Sign in";
       $("authSubmitBtn").dataset.mode = mode;
-      $("authError").classList.add("hidden");
+      $("authError")?.classList.add("hidden");
       $("authNameField")?.classList.toggle("hidden", mode !== "signup");
     },
 
@@ -79,8 +136,10 @@
       const display_name = $("authName")?.value.trim() || "";
       const errEl = $("authError");
       if (!email || !password) {
-        errEl.textContent = "Email and password required.";
-        errEl.classList.remove("hidden");
+        if (errEl) {
+          errEl.textContent = "Email and password required.";
+          errEl.classList.remove("hidden");
+        }
         return;
       }
       const path = mode === "signup" ? "/api/auth/signup" : "/api/auth/login";
@@ -106,16 +165,20 @@
         if (!r.ok) throw new Error(data.detail || data.error || "Auth failed");
         this.closeAuth();
         await this.refreshAuth();
-        window.toast?.(mode === "signup" ? "Welcome to Bridge!" : "Signed in");
+        window.toast?.(mode === "signup" ? "Welcome! Your library is ready." : "Signed in — your library is below.");
+        if (authUser) setTimeout(() => this.scrollToLibrary(), 400);
       } catch (e) {
-        errEl.textContent = e.message;
-        errEl.classList.remove("hidden");
+        if (errEl) {
+          errEl.textContent = e.message;
+          errEl.classList.remove("hidden");
+        }
       }
     },
 
     async logout() {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
       authUser = null;
+      sessionSaved = false;
       await this.refreshAuth();
       window.toast?.("Signed out");
     },
@@ -123,6 +186,9 @@
     async saveCurrentBridge() {
       if (!window.lastSession) return window.toast?.("Generate a bridge first");
       if (!authUser) return this.openAuth("login");
+      if (sessionSaved) return window.toast?.("Already in your library");
+      const saveBtn = $("saveBridgeBtn");
+      if (saveBtn) saveBtn.disabled = true;
       try {
         const r = await fetch("/api/bridges/save", {
           method: "POST",
@@ -130,51 +196,102 @@
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(window.lastSession),
         });
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.detail || "Save failed");
-        window.toast?.("Bridge saved to your library");
+        const raw = await r.text();
+        let data = {};
+        try {
+          data = raw ? JSON.parse(raw) : {};
+        } catch {
+          throw new Error("Could not save bridge — try again.");
+        }
+        if (!r.ok) throw new Error(data.detail || data.error || "Save failed");
+        this.markSessionSaved();
+        window.toast?.("Saved to your library");
+        await this.loadSavedBridges();
+        setTimeout(() => this.scrollToLibrary(), 300);
+      } catch (e) {
+        if (saveBtn) saveBtn.disabled = false;
+        window.toast?.(e.message);
+      }
+    },
+
+    async deleteSavedBridge(id, cardEl) {
+      if (!authUser || !id) return;
+      cardEl?.classList.add("saved-bridge-card--deleting");
+      try {
+        const r = await fetch(`/api/bridges/saved/${id}`, {
+          method: "DELETE",
+          credentials: "include",
+        });
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}));
+          throw new Error(data.detail || "Could not delete");
+        }
+        window.toast?.("Removed from library");
         await this.loadSavedBridges();
       } catch (e) {
+        cardEl?.classList.remove("saved-bridge-card--deleting");
         window.toast?.(e.message);
       }
     },
 
     async loadSavedBridges() {
       const el = $("savedBridges");
+      const panel = $("libraryPanel");
+      const countEl = $("libraryCount");
       if (!el || !authUser) {
-        el?.classList.add("hidden");
+        panel?.classList.add("hidden");
         return;
       }
+      panel?.classList.remove("hidden");
+      el.innerHTML = `<div class="saved-bridges__loading"><span class="search-results__spinner"></span>Loading library…</div>`;
       try {
         const data = await fetch("/api/bridges/saved", { credentials: "include" }).then(r => r.json());
         const bridges = data.bridges || [];
+        if (countEl) countEl.textContent = bridges.length ? String(bridges.length) : "";
         if (!bridges.length) {
-          el.classList.add("hidden");
+          el.innerHTML = `
+            <div class="library-empty">
+              <p class="library-empty__title">No saved bridges yet</p>
+              <p class="library-empty__sub">Generate a bridge, then tap <strong>Save bridge</strong> to keep it here.</p>
+            </div>`;
           return;
         }
-        el.classList.remove("hidden");
         el.innerHTML = `
-          <div class="saved-bridges__head">
-            <h3>Your saved bridges</h3>
-            <span class="saved-bridges__count">${bridges.length}</span>
-          </div>
           <div class="saved-bridges__scroll">
-            ${bridges.map(b => `
-              <button type="button" class="saved-bridge-card" data-id="${b.id}">
-                <span class="saved-bridge-card__title">${escapeHtml(b.title || b.anchor_track)}</span>
-                <span class="saved-bridge-card__meta">${escapeHtml((b.intent || "").slice(0, 48))}${(b.intent || "").length > 48 ? "…" : ""}</span>
-              </button>
-            `).join("")}
+            ${bridges.map(b => {
+              const trackCount = (b.tracks || []).length;
+              const date = formatBridgeDate(b.created_at);
+              return `
+              <div class="saved-bridge-card" data-id="${escapeHtml(b.id)}">
+                <button type="button" class="saved-bridge-card__open" data-id="${escapeHtml(b.id)}">
+                  <span class="saved-bridge-card__title">${escapeHtml(b.title || b.anchor_track)}</span>
+                  <span class="saved-bridge-card__meta">${escapeHtml((b.intent || "").slice(0, 56))}${(b.intent || "").length > 56 ? "…" : ""}</span>
+                  <span class="saved-bridge-card__foot">${trackCount ? `${trackCount} tracks` : "8 tracks"}${date ? ` · ${date}` : ""}</span>
+                </button>
+                <button type="button" class="saved-bridge-card__delete" data-delete="${escapeHtml(b.id)}" aria-label="Delete saved bridge">×</button>
+              </div>`;
+            }).join("")}
           </div>`;
-        el.querySelectorAll(".saved-bridge-card").forEach(btn => {
+        el.querySelectorAll(".saved-bridge-card__open").forEach(btn => {
           btn.addEventListener("click", () => this.openSavedBridge(btn.dataset.id));
         });
+        el.querySelectorAll("[data-delete]").forEach(btn => {
+          btn.addEventListener("click", e => {
+            e.stopPropagation();
+            this.deleteSavedBridge(btn.dataset.delete, btn.closest(".saved-bridge-card"));
+          });
+        });
       } catch {
-        el.classList.add("hidden");
+        el.innerHTML = `
+          <div class="library-empty">
+            <p class="library-empty__title">Could not load library</p>
+            <p class="library-empty__sub">Check your connection and try again.</p>
+          </div>`;
       }
     },
 
     async openSavedBridge(id) {
+      if (!id) return;
       try {
         const bridge = await fetch(`/api/bridges/saved/${id}`, { credentials: "include" }).then(r => r.json());
         const session = {
@@ -186,7 +303,9 @@
           tracks: bridge.tracks,
         };
         window.displaySession?.(session);
-        window.toast?.("Saved bridge loaded");
+        this.markSessionSaved();
+        window.toast?.("Bridge loaded from library");
+        $("sessionBlock")?.scrollIntoView({ behavior: "smooth", block: "start" });
       } catch {
         window.toast?.("Could not open saved bridge");
       }
@@ -200,8 +319,9 @@
       ).join("");
       el.querySelectorAll(".chip--mood").forEach(btn => {
         btn.addEventListener("click", () => {
-          $("intentInput").value = btn.dataset.intent;
-          $("intentInput").focus();
+          const input = $("intentInput");
+          if (input) input.value = btn.dataset.intent;
+          input?.focus();
         });
       });
     },
@@ -218,7 +338,7 @@
           window.displaySession?.(session);
           window.toast?.("Picked up where you left off");
         });
-        const title = document.getElementById("continueBridgeTitle");
+        const title = $("continueBridgeTitle");
         if (title) title.textContent = `Continue: ${session.anchor_track}`;
       } catch { /* ignore */ }
     },
@@ -241,6 +361,8 @@
       bound = true;
       $("authLoginBtn")?.addEventListener("click", () => this.openAuth("login"));
       $("authSignupBtn")?.addEventListener("click", () => this.openAuth("signup"));
+      $("libraryHintSignIn")?.addEventListener("click", () => this.openAuth("login"));
+      $("libraryNavBtn")?.addEventListener("click", () => this.scrollToLibrary());
       $("authSubmitBtn")?.addEventListener("click", () => this.submitAuth());
       $("authLogoutBtn")?.addEventListener("click", () => this.logout());
       $("saveBridgeBtn")?.addEventListener("click", () => this.saveCurrentBridge());
@@ -264,6 +386,7 @@
         window.displaySession = session => {
           origDisplay(session);
           this.persistLastSession(session);
+          this.onSessionDisplay(session);
           if (authUser) this.loadSavedBridges();
         };
       }

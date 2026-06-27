@@ -44,6 +44,7 @@
           <button type="button" class="btn-spotify btn-spotify--green btn-spotify--sm" id="authSignupBtn">Sign up</button>
         </div>
         <div class="topbar__auth hidden" id="authSignedIn">
+          <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="libraryNavBtn" title="Jump to your library">Library</button>
           <span class="auth-user-pill">Hi, <strong id="authUserName">you</strong></span>
           <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="authLogoutBtn">Sign out</button>
         </div>
@@ -59,15 +60,27 @@
             </div>
           </div>
 
+          <div id="libraryHint" class="library-hint">
+            <p class="library-hint__text">Sign in to save bridges and pick them up on any device.</p>
+            <button type="button" class="btn-spotify btn-spotify--green btn-spotify--sm" id="libraryHintSignIn">Sign in free</button>
+          </div>
+
+          <section id="libraryPanel" class="library-panel hidden" aria-labelledby="libraryPanelTitle">
+            <div class="library-panel__head">
+              <h2 id="libraryPanelTitle" class="library-panel__title">Your library</h2>
+              <span class="library-panel__count" id="libraryCount"></span>
+            </div>
+            <p class="library-panel__sub">Saved bridges — tap to resume, or delete ones you no longer need.</p>
+            <div id="savedBridges" class="saved-bridges" aria-label="Saved bridges"></div>
+          </section>
+
           <div id="continueBridge" class="continue-bridge hidden">
             <div>
               <div class="continue-bridge__title" id="continueBridgeTitle">Continue your last bridge</div>
-              <div class="continue-bridge__sub">Pick up where you left off</div>
+              <div class="continue-bridge__sub">Pick up where you left off on this device</div>
             </div>
             <button type="button" class="btn-spotify btn-spotify--green btn-spotify--sm" data-continue>Resume</button>
           </div>
-
-          <div id="savedBridges" class="saved-bridges hidden" aria-label="Saved bridges"></div>
 
           <div class="bridge-form">
             <label class="form-label">Anchor track</label>
@@ -121,6 +134,19 @@
         </section>
       </div>
     </div>
+
+    <aside id="bridgeArtPanel" class="bridge-art-panel hidden" aria-hidden="true">
+      <div class="bridge-art-panel__bg" id="bridgeArtBg"></div>
+      <div class="bridge-art-panel__content">
+        <div class="bridge-art-panel__art" id="bridgeArtHero"></div>
+        <div class="bridge-art-panel__meta">
+          <p class="bridge-art-panel__step" id="bridgeArtStep"></p>
+          <h2 class="bridge-art-panel__title" id="bridgeArtTitle"></h2>
+          <p class="bridge-art-panel__artist" id="bridgeArtArtist"></p>
+          <p class="bridge-art-panel__note" id="bridgeArtNote"></p>
+        </div>
+      </div>
+    </aside>
 
     <footer class="now-playing hidden" id="previewBar">
       <div class="bridge-player bridge-player--minimal">
