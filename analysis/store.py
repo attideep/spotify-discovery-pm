@@ -3,11 +3,20 @@ from __future__ import annotations
 import hashlib
 import json
 import math
+import os
 import sqlite3
 from pathlib import Path
 
 from discovery.config import get_settings
 from discovery.models import ReviewRecord
+
+
+def _reviews_db_path() -> Path:
+    """Vercel serverless has a read-only project dir; only /tmp is writable."""
+    if os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"):
+        return Path("/tmp") / "spotify-discovery-reviews.db"
+    settings = get_settings()
+    return Path(settings.data_dir) / "reviews.db"
 
 
 def _hash_embedding(text: str, dim: int = 384) -> list[float]:
@@ -27,8 +36,7 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 class ReviewStore:
     def __init__(self, db_path: str | None = None) -> None:
-        settings = get_settings()
-        self.db_path = db_path or str(Path(settings.data_dir) / "reviews.db")
+        self.db_path = db_path or str(_reviews_db_path())
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
