@@ -27,19 +27,10 @@ const PLANNER_LABELS = {
   shared: "Shared session",
 };
 
-let isConnected = false;
 let lastSession = null;
 let currentTracks = [];
 let currentTrackIdx = 0;
-let loaderStepTimer = null;
-
-const LOADER_STEPS = [
-  "Finding your anchor…",
-  "Searching 10,000 tracks…",
-  "Scoring familiarity vs novelty…",
-  "Sequencing your bridge…",
-  "Writing step explanations…",
-];
+let bridgeProgressTimer = null;
 
 function setGreeting() {
   const el = document.getElementById("greeting");
@@ -114,11 +105,12 @@ async function tryLoadSharedBridge(shareParams) {
 
   switchTab("bridge", { preserveQuery: true });
   clearBridgeError();
-  setBridgeLoading(true, "Loading shared bridge…");
+  startBridgeProgress("Loading shared bridge…");
 
   if (params.get("share")) {
     try {
       displaySession(decodeShare(params.get("share")));
+      stopBridgeProgress();
       setBridgeLoading(false);
       toast("Shared bridge session loaded");
       return;
@@ -129,6 +121,7 @@ async function tryLoadSharedBridge(shareParams) {
 
   const intent = params.get("intent") || params.get("i");
   if (!intent) {
+    stopBridgeProgress();
     setBridgeLoading(false);
     showBridgeError("Could not load shared bridge — link may be truncated. Generate a new one and copy again.");
     return;
@@ -153,7 +146,7 @@ async function tryLoadSharedBridge(shareParams) {
       session = await fetchJSON("/api/bridge", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ intent, anchor, demo: !isConnected }),
+        body: JSON.stringify({ intent, anchor, demo: true }),
       });
     }
     session._shareAnchor = anchorId || session.anchor_id || "";
@@ -168,6 +161,7 @@ async function tryLoadSharedBridge(shareParams) {
   } catch (e) {
     showBridgeError(e.message || "Could not load shared bridge.");
   } finally {
+    stopBridgeProgress();
     setBridgeLoading(false);
   }
 }
@@ -181,7 +175,7 @@ function displaySession(session) {
   sessionBlock.classList.add("session-block");
   document.getElementById("sessionTitle").textContent = `Bridge from ${session.anchor_track}`;
   document.getElementById("sessionSummary").textContent = session.session_summary;
-  document.getElementById("sessionMode").textContent = session.mode === "live" ? "Live beta" : "Free";
+  document.getElementById("sessionMode").textContent = "Free";
   const plannerEl = document.getElementById("sessionPlanner");
   const plannerLabel = PLANNER_LABELS[session.planner] || "";
   if (plannerEl) {
@@ -195,14 +189,7 @@ function displaySession(session) {
   renderNoveltyJourney(session.tracks);
   renderTracks(session.tracks, { animate: true });
 
-  const saveBtn = document.getElementById("savePlaylistBtn");
-  const shareBtn = document.getElementById("shareBridgeBtn");
-  if (isConnected && session.mode === "live") {
-    saveBtn.classList.remove("hidden");
-  } else {
-    saveBtn.classList.add("hidden");
-  }
-  shareBtn.classList.remove("hidden");
+  document.getElementById("shareBridgeBtn")?.classList.remove("hidden");
   sessionBlock.scrollIntoView({ behavior: "smooth", block: "start" });
   window.BridgeExtras?.renderStats(session);
   window.BridgeExtras?.saveHistory(session);
@@ -241,32 +228,40 @@ function clearBridgeError() {
   document.getElementById("bridgeError").classList.add("hidden");
 }
 
-function setBridgeLoading(loading, message = "Building your bridge…") {
+function setBridgeLoading(loading, message = "Building your bridge…", progress = null) {
   const overlay = document.getElementById("bridgeLoader");
   const title = document.getElementById("bridgeLoaderTitle");
   const subtitle = document.getElementById("bridgeLoaderSubtitle");
-  const progress = document.getElementById("bridgeLoaderProgress");
+  const progressEl = document.getElementById("bridgeLoaderProgress");
   const btn = document.getElementById("buildBtn");
   if (title) title.textContent = message;
+  if (subtitle) subtitle.textContent = loading ? "This usually takes a few seconds" : "";
   overlay?.classList.toggle("hidden", !loading);
+  overlay?.setAttribute("aria-busy", loading ? "true" : "false");
   if (btn) {
     btn.disabled = loading;
     btn.setAttribute("aria-busy", loading ? "true" : "false");
   }
-  clearInterval(loaderStepTimer);
-  if (loading) {
-    let step = 0;
-    if (progress) progress.style.width = "8%";
-    loaderStepTimer = setInterval(() => {
-      step = (step + 1) % LOADER_STEPS.length;
-      if (title) title.textContent = LOADER_STEPS[step];
-      if (subtitle) subtitle.textContent = `Step ${step + 1} of ${LOADER_STEPS.length}`;
-      if (progress) progress.style.width = `${Math.min(92, 12 + step * 18)}%`;
-    }, 1400);
-  } else {
-    if (progress) progress.style.width = "100%";
-    if (subtitle) subtitle.textContent = "Sequencing tracks from familiar to new";
+  if (progressEl && progress != null) {
+    progressEl.style.width = `${Math.min(100, Math.max(0, progress))}%`;
+  } else if (progressEl && !loading) {
+    progressEl.style.width = "0%";
   }
+}
+
+function startBridgeProgress(message = "Building your bridge…") {
+  clearInterval(bridgeProgressTimer);
+  let p = 8;
+  setBridgeLoading(true, message, p);
+  bridgeProgressTimer = setInterval(() => {
+    p = Math.min(92, p + Math.max(0.4, (94 - p) * 0.07));
+    setBridgeLoading(true, message, p);
+  }, 320);
+}
+
+function stopBridgeProgress() {
+  clearInterval(bridgeProgressTimer);
+  bridgeProgressTimer = null;
 }
 
 /* ── Tab navigation ── */
@@ -372,56 +367,6 @@ if (["home", "bridge", "insights", "ask"].includes(INITIAL_HASH.tab)) {
   );
   switchTab(INITIAL_HASH.tab, { preserveQuery: hasShareQuery });
 }
-
-const urlError = INITIAL_HASH.params.get("error");
-if (urlError) {
-  switchTab("bridge");
-  showBridgeError(`Spotify connection failed (${urlError}). Try again.`);
-}
-
-/* ── Auth ── */
-async function refreshAuthUI() {
-  const status = await fetchJSON("/api/auth/status");
-  isConnected = status.connected;
-  const login = document.getElementById("spotifyLogin");
-  const logout = document.getElementById("logoutBtn");
-  const authStatus = document.getElementById("authStatus");
-  const connectBeta = document.getElementById("connectBeta");
-
-  if (isConnected) {
-    login.textContent = `Connected · ${status.display_name}`;
-    login.classList.add("btn-spotify--disabled");
-    login.removeAttribute("href");
-    logout.classList.remove("hidden");
-    authStatus.textContent = "Beta connected — personalized bridges and save playlist enabled.";
-    connectBeta?.classList.add("connect-beta--connected");
-  } else {
-    login.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg> Request beta access`;
-    logout.classList.add("hidden");
-    connectBeta?.classList.remove("connect-beta--connected");
-    authStatus.textContent = "Free mode — unlimited bridges for everyone. No Spotify login needed.";
-
-    if (status.spotify_configured) {
-      login.classList.remove("btn-spotify--disabled");
-      login.href = "/mvp/login";
-      login.onclick = null;
-    } else {
-      login.classList.add("btn-spotify--disabled");
-      login.removeAttribute("href");
-      login.onclick = (e) => {
-        e.preventDefault();
-        toast("Private beta invites opening soon — free bridges work without login.");
-      };
-    }
-  }
-}
-
-document.getElementById("logoutBtn")?.addEventListener("click", async () => {
-  await fetchJSON("/mvp/logout", { method: "POST" });
-  isConnected = false;
-  await refreshAuthUI();
-  toast("Logged out");
-});
 
 /* ── Anchor preview + song search ── */
 let anchorSearchTimer = null;
@@ -881,16 +826,16 @@ function renderNoveltyJourney(tracks) {
   });
 }
 
-function selectTrack(idx) {
+async function selectTrack(idx) {
   if (!currentTracks[idx]) return;
   currentTrackIdx = idx;
-  updatePlayer(currentTracks[idx], idx);
   document.querySelectorAll(".track-row").forEach((row, i) => {
     row.classList.toggle("track-row--active", i === idx);
   });
+  await updatePlayer(currentTracks[idx], idx);
 }
 
-function updatePlayer(track, idx) {
+async function updatePlayer(track, idx) {
   const bar = document.getElementById("previewBar");
   const app = document.querySelector(".app");
   if (!track) {
@@ -916,7 +861,7 @@ function updatePlayer(track, idx) {
     artEl.style.background = GRADIENTS[idx % GRADIENTS.length];
     artEl.classList.remove("bridge-player__art--spin");
   }
-  window.BridgePlayer?.loadTrack(track);
+  await window.BridgePlayer?.loadTrack(track);
 }
 
 function renderTracks(tracks, { animate = false } = {}) {
@@ -981,22 +926,24 @@ document.getElementById("buildBtn")?.addEventListener("click", async () => {
   const intent = document.getElementById("intentInput").value.trim();
   if (!intent) return toast("Enter your intent first");
   const anchor = document.getElementById("anchorInput").value.trim() || null;
-  setBridgeLoading(true);
+  startBridgeProgress(anchor ? "Resolving anchor and building bridge…" : "Building your bridge…");
 
   try {
     const session = await fetchJSON("/api/bridge", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ intent, anchor, demo: !isConnected }),
+      body: JSON.stringify({ intent, anchor, demo: true }),
     });
 
     session._shareAnchor = session.anchor_id || parseTrackId(anchor || "");
+    setBridgeLoading(true, "Preparing your session…", 96);
     displaySession(session);
+    setBridgeLoading(true, "Bridge ready", 100);
     toast(`Bridge ready — ${session.tracks.length} tracks`);
   } catch (e) {
     showBridgeError(e.message);
-    if (e.code === "auth_required") switchTab("bridge");
   } finally {
+    stopBridgeProgress();
     setBridgeLoading(false);
   }
 });
@@ -1033,27 +980,6 @@ document.getElementById("playerNext")?.addEventListener("click", () => {
   selectTrack((currentTrackIdx + 1) % currentTracks.length);
 });
 
-document.getElementById("savePlaylistBtn")?.addEventListener("click", async () => {
-  if (!lastSession) return;
-  clearBridgeError();
-  toast("Saving playlist to Spotify…");
-  try {
-    const result = await fetchJSON("/api/bridge/save", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        track_ids: lastSession.tracks.map(t => t.track_id),
-        anchor_track: lastSession.anchor_track,
-        intent: lastSession.intent,
-      }),
-    });
-    toast("Playlist saved!");
-    if (result.playlist_url) window.open(result.playlist_url, "_blank");
-  } catch (e) {
-    showBridgeError(e.message);
-  }
-});
-
 document.getElementById("playerOpen")?.addEventListener("click", () => {
   if (currentTracks.length && currentTracks[currentTrackIdx]?.spotify_url) {
     window.open(currentTracks[currentTrackIdx].spotify_url, "_blank");
@@ -1073,7 +999,6 @@ async function boot() {
   window.BridgePlayer?.init();
   window.BridgeExtras?.bindShortcuts();
   initExampleChips();
-  await refreshAuthUI().catch(() => {});
   await tryLoadSharedBridge(INITIAL_HASH.params);
   await loadInsights().catch(() => {});
   fetchJSON("/health").then(h => {

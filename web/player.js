@@ -1,16 +1,63 @@
-/** Custom bridge player — Spotify audio via hidden embed API + our UI chrome. */
+/** Bridge player — HTML5 preview + Web Audio (volume + bass/mid/treble EQ). */
 (function () {
   const STORAGE_VOL = "bridge_player_volume";
-  let embedController = null;
-  let spotifyApi = null;
+  const STORAGE_EQ = "bridge_player_eq";
+  const previewCache = new Map();
+
+  let audio = null;
+  let source = null;
+  let ctx = null;
+  let gain = null;
+  let bass = null;
+  let mid = null;
+  let treble = null;
+  let analyser = null;
   let eqAnim = null;
   let isPlaying = false;
+  let loadGen = 0;
+  let tourTimer = null;
+
+  function readEq() {
+    try {
+      return JSON.parse(localStorage.getItem(STORAGE_EQ) || '{"bass":0,"mid":0,"treble":0}');
+    } catch {
+      return { bass: 0, mid: 0, treble: 0 };
+    }
+  }
+
+  function saveEq(values) {
+    localStorage.setItem(STORAGE_EQ, JSON.stringify(values));
+  }
+
+  async function fetchPreviewUrl(track) {
+    const key = track.track_id || `${track.name}|${track.artist}`;
+    if (previewCache.has(key)) return previewCache.get(key);
+
+    const q = encodeURIComponent(`${track.artist || ""} ${track.name || ""}`.trim());
+    if (!q) return null;
+
+    try {
+      const r = await fetch(`https://api.deezer.com/search/track?q=${q}&limit=5`);
+      const data = await r.json();
+      const items = data.data || [];
+      const norm = s => (s || "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+      const want = norm(track.name);
+      let hit = items.find(t => norm(t.title).includes(want) || want.includes(norm(t.title)));
+      if (!hit) hit = items[0];
+      const url = hit?.preview || null;
+      previewCache.set(key, url);
+      return url;
+    } catch {
+      return null;
+    }
+  }
 
   window.BridgePlayer = {
     init() {
       this._bindControls();
       this._loadVolume();
-      this._initEq();
+      this._loadEqSliders();
+      this._initEqCanvas();
     },
 
     _bindControls() {
@@ -19,8 +66,10 @@
         const v = parseInt(e.target.value, 10) / 100;
         localStorage.setItem(STORAGE_VOL, String(v));
         this._setVolumeLabel(v);
-        if (v === 0) this.pause();
-        else if (!isPlaying && embedController) this.play();
+        if (gain) gain.gain.value = v;
+      });
+      ["eqBass", "eqMid", "eqTreble"].forEach(id => {
+        document.getElementById(id)?.addEventListener("input", () => this._applyEqFromSliders());
       });
       document.getElementById("playerMenuBtn")?.addEventListener("click", () => {
         document.getElementById("playerMenu")?.classList.toggle("hidden");
@@ -28,8 +77,7 @@
       document.querySelectorAll("[data-legal]").forEach(btn => {
         btn.addEventListener("click", () => {
           document.getElementById("playerMenu")?.classList.add("hidden");
-          const id = btn.dataset.legal;
-          document.getElementById(id)?.classList.remove("hidden");
+          document.getElementById(btn.dataset.legal)?.classList.remove("hidden");
         });
       });
       document.querySelectorAll("[data-close-modal]").forEach(btn => {
@@ -47,62 +95,165 @@
       this._setVolumeLabel(v);
     },
 
+    _loadEqSliders() {
+      const eq = readEq();
+      const map = { eqBass: "bass", eqMid: "mid", eqTreble: "treble" };
+      Object.entries(map).forEach(([id, k]) => {
+        const el = document.getElementById(id);
+        if (el) el.value = eq[k] ?? 0;
+      });
+    },
+
     _setVolumeLabel(v) {
       const el = document.getElementById("playerVolumeLabel");
       if (el) el.textContent = v === 0 ? "Muted" : `${Math.round(v * 100)}%`;
     },
 
-    loadTrack(track) {
-      if (!track?.track_id) return;
-      const host = document.getElementById("spotifyEmbedHost");
-      if (!host) return;
-      host.innerHTML = "";
-      embedController = null;
-      const uri = `spotify:track:${track.track_id}`;
-
-      const fallbackIframe = () => {
-        host.innerHTML = `<iframe src="https://open.spotify.com/embed/track/${track.track_id}?utm_source=generator&theme=0" width="1" height="1" style="opacity:0;position:absolute;pointer-events:none" allow="autoplay; clipboard-write; encrypted-media" title="Spotify preview"></iframe>`;
-        isPlaying = true;
-        this._syncPlayBtn();
-        this._startEq();
+    _applyEqFromSliders() {
+      const values = {
+        bass: parseInt(document.getElementById("eqBass")?.value || "0", 10),
+        mid: parseInt(document.getElementById("eqMid")?.value || "0", 10),
+        treble: parseInt(document.getElementById("eqTreble")?.value || "0", 10),
       };
-
-      if (!spotifyApi) {
-        fallbackIframe();
-        return;
-      }
-
-      spotifyApi.createController(host, { uri, width: 1, height: 1 }, controller => {
-        embedController = controller;
-        controller.addListener("ready", () => {
-          const vol = parseFloat(localStorage.getItem(STORAGE_VOL) || "0.85");
-          if (vol > 0) controller.play();
-          isPlaying = vol > 0;
-          this._syncPlayBtn();
-          if (isPlaying) this._startEq();
-        });
-        controller.addListener("playback_update", e => {
-          isPlaying = !e.data.isPaused;
-          this._syncPlayBtn();
-          if (isPlaying) this._startEq();
-          else this._stopEq();
-        });
-      });
+      saveEq(values);
+      if (bass) bass.gain.value = values.bass;
+      if (mid) mid.gain.value = values.mid;
+      if (treble) treble.gain.value = values.treble;
     },
 
-    stopEq() {
+    async _ensureContext() {
+      if (!ctx) {
+        ctx = new AudioContext();
+        bass = ctx.createBiquadFilter();
+        bass.type = "lowshelf";
+        bass.frequency.value = 150;
+        mid = ctx.createBiquadFilter();
+        mid.type = "peaking";
+        mid.frequency.value = 1000;
+        mid.Q.value = 0.9;
+        treble = ctx.createBiquadFilter();
+        treble.type = "highshelf";
+        treble.frequency.value = 4500;
+        gain = ctx.createGain();
+        analyser = ctx.createAnalyser();
+        analyser.fftSize = 64;
+        bass.connect(mid);
+        mid.connect(treble);
+        treble.connect(gain);
+        gain.connect(analyser);
+        analyser.connect(ctx.destination);
+        this._applyEqFromSliders();
+      }
+      if (ctx.state === "suspended") await ctx.resume();
+      const v = parseFloat(localStorage.getItem(STORAGE_VOL) || "0.85");
+      gain.gain.value = v;
+    },
+
+    _clearPlayback() {
+      if (audio) {
+        audio.pause();
+        audio.removeAttribute("src");
+        audio.load();
+        audio = null;
+      }
+      if (source) {
+        try { source.disconnect(); } catch { /* ignore */ }
+        source = null;
+      }
+      isPlaying = false;
+      this._syncPlayBtn();
       this._stopEq();
     },
 
-    play() {
-      embedController?.play?.();
+    async stop() {
+      loadGen += 1;
+      this._clearPlayback();
+    },
+
+    async loadTrack(track) {
+      if (!track?.track_id && !track?.name) return;
+      const gen = ++loadGen;
+      this._clearPlayback();
+
+      const badge = document.getElementById("playerBadge");
+      if (badge) badge.textContent = "Loading preview…";
+
+      const previewUrl = await fetchPreviewUrl(track);
+      if (gen !== loadGen) return;
+
+      if (!previewUrl) {
+        if (badge) badge.textContent = "No preview — tap Full song for Spotify";
+        window.toast?.("No preview clip found — open in Spotify for full track");
+        return;
+      }
+
+      await this._ensureContext();
+      if (gen !== loadGen) return;
+
+      audio = new Audio();
+      audio.crossOrigin = "anonymous";
+      audio.preload = "auto";
+      audio.src = previewUrl;
+
+      await new Promise((resolve, reject) => {
+        const done = () => {
+          audio.removeEventListener("canplay", done);
+          audio.removeEventListener("error", err);
+          resolve();
+        };
+        const err = () => {
+          audio.removeEventListener("canplay", done);
+          audio.removeEventListener("error", err);
+          reject(new Error("preview load failed"));
+        };
+        audio.addEventListener("canplay", done);
+        audio.addEventListener("error", err);
+      }).catch(() => {
+        if (badge) badge.textContent = "Preview unavailable";
+        return;
+      });
+
+      if (gen !== loadGen || !audio) return;
+
+      source = ctx.createMediaElementSource(audio);
+      source.connect(bass);
+
+      audio.addEventListener("ended", () => {
+        isPlaying = false;
+        this._syncPlayBtn();
+        this._stopEq();
+      });
+
+      const vol = parseFloat(localStorage.getItem(STORAGE_VOL) || "0.85");
+      if (vol > 0) {
+        try {
+          await audio.play();
+          isPlaying = true;
+          if (badge) badge.textContent = "30s preview · Full song in Spotify";
+          this._syncPlayBtn();
+          this._startEq();
+        } catch {
+          if (badge) badge.textContent = "Tap play to start preview";
+        }
+      } else if (badge) {
+        badge.textContent = "Unmuted — tap play";
+      }
+    },
+
+    async play() {
+      if (!audio) return;
+      await this._ensureContext();
+      const v = parseFloat(localStorage.getItem(STORAGE_VOL) || "0.85");
+      if (gain) gain.gain.value = v;
+      if (v === 0) return;
+      await audio.play();
       isPlaying = true;
       this._syncPlayBtn();
       this._startEq();
     },
 
-    pause() {
-      embedController?.pause?.();
+    async pause() {
+      if (audio) audio.pause();
       isPlaying = false;
       this._syncPlayBtn();
       this._stopEq();
@@ -118,40 +269,39 @@
       if (btn) btn.textContent = isPlaying ? "⏸" : "▶";
     },
 
-    _initEq() {
+    _initEqCanvas() {
       const canvas = document.getElementById("eqCanvas");
       if (!canvas) return;
-      const ctx = canvas.getContext("2d");
       const resize = () => {
         canvas.width = canvas.offsetWidth * (window.devicePixelRatio || 1);
         canvas.height = canvas.offsetHeight * (window.devicePixelRatio || 1);
       };
       resize();
       window.addEventListener("resize", resize);
-      this._eqCtx = ctx;
       this._eqCanvas = canvas;
+      this._eqCtx = canvas.getContext("2d");
     },
 
     _startEq() {
-      if (eqAnim || !this._eqCtx) return;
-      const ctx = this._eqCtx;
+      if (eqAnim || !this._eqCtx || !analyser) return;
       const canvas = this._eqCanvas;
-      const bars = 24;
-      const phases = Array.from({ length: bars }, () => Math.random() * Math.PI * 2);
+      const ctx2d = this._eqCtx;
+      const data = new Uint8Array(analyser.frequencyBinCount);
       const draw = () => {
+        analyser.getByteFrequencyData(data);
         const w = canvas.width;
         const h = canvas.height;
-        ctx.clearRect(0, 0, w, h);
-        const bw = w / bars;
+        ctx2d.clearRect(0, 0, w, h);
+        const bars = 24;
+        const step = Math.floor(data.length / bars);
         for (let i = 0; i < bars; i += 1) {
-          phases[i] += 0.08 + i * 0.004;
-          const amp = (Math.sin(phases[i]) * 0.35 + 0.55) * (0.4 + (i % 5) * 0.08);
-          const bh = amp * h * 0.9;
-          const g = ctx.createLinearGradient(0, h - bh, 0, h);
+          const v = data[i * step] / 255;
+          const bh = v * h * 0.95;
+          const g = ctx2d.createLinearGradient(0, h - bh, 0, h);
           g.addColorStop(0, "#1ed760");
           g.addColorStop(1, "#509bf5");
-          ctx.fillStyle = g;
-          ctx.fillRect(i * bw + 1, h - bh, bw - 2, bh);
+          ctx2d.fillStyle = g;
+          ctx2d.fillRect((i * w) / bars + 1, h - bh, w / bars - 2, bh);
         }
         eqAnim = requestAnimationFrame(draw);
       };
@@ -166,25 +316,20 @@
       }
     },
 
-    tourTimer: null,
     toggleTour() {
       const btn = document.getElementById("playerTourBtn");
-      if (this.tourTimer) {
-        clearInterval(this.tourTimer);
-        this.tourTimer = null;
-        if (btn) btn.classList.remove("chip--active");
+      if (tourTimer) {
+        clearInterval(tourTimer);
+        tourTimer = null;
+        btn?.classList.remove("chip--active");
         window.toast?.("Bridge tour paused");
         return;
       }
-      if (btn) btn.classList.add("chip--active");
-      window.toast?.("Bridge tour — auto-advancing every 30s");
-      this.tourTimer = setInterval(() => {
+      btn?.classList.add("chip--active");
+      window.toast?.("Auto tour — next track every 30s");
+      tourTimer = setInterval(() => {
         document.getElementById("playerNext")?.click();
       }, 30000);
     },
-  };
-
-  window.onSpotifyIframeApiReady = IFrameAPI => {
-    spotifyApi = IFrameAPI;
   };
 })();
