@@ -57,7 +57,10 @@ def _pg_conn():
         return None
     import psycopg
 
-    return psycopg.connect(url)
+    try:
+        return psycopg.connect(url, connect_timeout=10)
+    except Exception:
+        return None
 
 
 def _sqlite_conn() -> sqlite3.Connection:
@@ -85,6 +88,15 @@ def ensure_user_schema() -> bool:
     if pg:
         try:
             with pg, pg.cursor() as cur:
+                cur.execute(
+                    """
+                    SELECT 1 FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name = 'app_users'
+                    """
+                )
+                if cur.fetchone():
+                    _user_schema_ready = True
+                    return True
                 cur.execute(_USER_SCHEMA_PG)
             _user_schema_ready = True
             return True

@@ -30,7 +30,10 @@ def get_connection():
         return None
     import psycopg
 
-    return psycopg.connect(url)
+    try:
+        return psycopg.connect(url, connect_timeout=10)
+    except Exception:
+        return None
 
 
 def ensure_schema() -> bool:
