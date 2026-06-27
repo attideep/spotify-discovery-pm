@@ -3,7 +3,20 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-  <title>Spotify — Bridge Sessions</title>
+  <title>Bridge Sessions — gradual music discovery</title>
+  <meta name="description" content="Free 8-track listening bridges from a song you love toward something new. Each step explained. No login, 10k song catalog." />
+  <meta name="theme-color" content="#1ed760" />
+  <link rel="icon" href="/static/icon.svg" type="image/svg+xml" />
+  <link rel="manifest" href="/static/manifest.json" />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://spotify-discovery-pm.vercel.app/" />
+  <meta property="og:title" content="Bridge Sessions — how is this free?" />
+  <meta property="og:description" content="8-track journeys from familiar → novel. Search any song, get explained transitions. No Spotify login." />
+  <meta property="og:image" content="https://spotify-discovery-pm.vercel.app/static/og.svg" />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Bridge Sessions" />
+  <meta name="twitter:description" content="Gradual music discovery — 8 explained steps from your anchor track." />
+  <meta name="twitter:image" content="https://spotify-discovery-pm.vercel.app/static/og.svg" />
   <style>
     html,body{height:100%;margin:0;background:#000;color:#fff;overflow:hidden}
     .panel:not(.active){display:none!important}
@@ -18,7 +31,7 @@
     <aside class="sidebar">
       <div class="sidebar__logo">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="#1ed760"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/></svg>
-        <span class="sidebar__logo-text">Spotify</span>
+        <span class="sidebar__logo-text">Bridge</span>
         <span class="sidebar__badge">Public Beta</span>
       </div>
 
@@ -85,7 +98,7 @@
             <button type="button" class="btn-spotify btn-spotify--green btn-spotify--sm" id="comfortLoopCta">Try a commute bridge</button>
           </div>
 
-          <h1 class="greeting">Good evening</h1>
+          <h1 class="greeting" id="greeting">Good evening</h1>
           <div class="stats-row" id="statsRow">
             <div class="stat-pill"><div class="stat-pill__value" id="statReviews">—</div><div class="stat-pill__label">Reviews analyzed</div></div>
             <div class="stat-pill"><div class="stat-pill__value" id="statThemes">—</div><div class="stat-pill__label">Discovery themes</div></div>
@@ -171,22 +184,24 @@
               <div class="bridge-loader__card">
                 <div class="bridge-loader__spinner" aria-hidden="true"></div>
                 <p class="bridge-loader__title" id="bridgeLoaderTitle">Building your bridge…</p>
-                <p class="bridge-loader__subtitle">Sequencing tracks from familiar to new</p>
+                <p class="bridge-loader__subtitle" id="bridgeLoaderSubtitle">Sequencing tracks from familiar to new</p>
+                <div class="bridge-loader__progress" aria-hidden="true"><div class="bridge-loader__progress-fill" id="bridgeLoaderProgress"></div></div>
               </div>
             </div>
             <p id="bridgeError" class="bridge-error hidden"></p>
           </div>
 
-          <div id="sessionBlock" class="hidden">
+          <div id="sessionBlock" class="session-block hidden">
             <div class="section-header">
               <h2 id="sessionTitle">Your bridge</h2>
               <div class="session-header-actions">
                 <span id="sessionMode" class="sidebar__badge"></span>
                 <span id="sessionPlanner" class="sidebar__badge sidebar__badge--muted hidden"></span>
-                <button type="button" id="shareBridgeBtn" class="btn-spotify btn-spotify--ghost btn-spotify--sm hidden">Copy share link</button>
+                <button type="button" id="shareBridgeBtn" class="btn-spotify btn-spotify--ghost btn-spotify--sm hidden">Share bridge</button>
               </div>
             </div>
-            <p id="sessionSummary" style="color:var(--text-subdued);margin:-8px 0 16px;font-size:14px"></p>
+            <p id="sessionSummary" class="session-summary"></p>
+            <div id="noveltyJourney" class="novelty-journey hidden" aria-label="Novelty arc from familiar to novel"></div>
             <div class="track-list-header">
               <span>#</span><span>Title</span><span>Novelty</span><span></span><span></span>
             </div>
@@ -219,20 +234,23 @@
       </div>
     </div>
 
-    <!-- Preview bar — opens current bridge track in Spotify (not an in-app player) -->
+    <!-- Preview bar — Spotify embed + quick open -->
     <footer class="now-playing hidden" id="previewBar">
-      <div class="now-playing__track">
-        <div class="now-playing__art" id="playerArt"></div>
-        <div class="now-playing__meta">
-          <div class="now-playing__title" id="playerTitle">Generate a bridge to preview tracks</div>
-          <div class="now-playing__artist" id="playerArtist">Bridge Sessions</div>
+      <div class="now-playing__embed" id="playerEmbed" aria-label="Spotify preview player"></div>
+      <div class="now-playing__compact">
+        <div class="now-playing__track">
+          <div class="now-playing__art" id="playerArt"></div>
+          <div class="now-playing__meta">
+            <div class="now-playing__title" id="playerTitle">Tap a track to preview</div>
+            <div class="now-playing__artist" id="playerArtist">Bridge Sessions</div>
+          </div>
         </div>
-      </div>
-      <div class="now-playing__actions">
-        <span class="now-playing__step" id="playerStep"></span>
-        <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="playerOpen">
-          Open in Spotify
-        </button>
+        <div class="now-playing__actions">
+          <span class="now-playing__step" id="playerStep"></span>
+          <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="playerPrev" aria-label="Previous track">‹</button>
+          <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="playerNext" aria-label="Next track">›</button>
+          <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="playerOpen">Open in Spotify</button>
+        </div>
       </div>
     </footer>
   </div>

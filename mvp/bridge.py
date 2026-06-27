@@ -100,6 +100,47 @@ def _listen_context_hint(intent: str) -> str:
     return "Context: general discovery — gradual novelty from anchor toward intent."
 
 
+def _explain_step(
+    anchor: dict,
+    track: dict,
+    intent: str,
+    step_i: int,
+    *,
+    same_artist: bool,
+    intent_hits: int,
+    intent_tokens: list[str],
+) -> str:
+    anchor_name = anchor.get("name", "your anchor")
+    track_name = track.get("name", "this track")
+    artist = (track.get("artist") or "").split(",")[0].strip()
+    snippet = " ".join(intent_tokens[:4]) if intent_tokens else intent[:48]
+
+    if step_i == 0:
+        if same_artist:
+            return f"Stays in {artist}'s world — a soft launch from {anchor_name}."
+        return f"Closest to {anchor_name} before we edge toward “{snippet}”."
+
+    if step_i >= 7:
+        return f"The boldest step — {track_name} stretches furthest while still on the path."
+
+    if same_artist:
+        return f"Another angle from {artist} — familiar voice, slightly new energy."
+
+    if intent_hits >= 2:
+        return f"Lines up with “{snippet}” and pushes one notch further out."
+
+    if intent_hits == 1 and intent_tokens:
+        return f"Echoes “{intent_tokens[0]}” from your intent — step {step_i + 1} in the arc."
+
+    templates = [
+        f"{track_name} shares DNA with {anchor_name} but opens a side door.",
+        f"{artist} keeps the mood coherent while widening the palette.",
+        f"A measured leap — still listenable after {anchor_name}.",
+        f"Bridges toward something fresher without jarring the flow.",
+    ]
+    return templates[step_i % len(templates)]
+
+
 def _plan_with_llm(
     anchor: dict,
     candidates: list[dict],
@@ -229,12 +270,12 @@ def _plan_heuristic(anchor: dict, candidates: list[dict], intent: str) -> list[d
         blob = f"{c.get('name', '')} {c.get('artist', '')}".lower()
         intent_hits = sum(1 for t in intent_tokens if _token_in_blob(t, blob))
         same_artist = bool(anchor_artist) and anchor_artist.split(",")[0].strip() in (c.get("artist") or "").lower()
-        if same_artist:
-            why = f"Stays close to {anchor['name']} while opening toward your intent."
-        elif intent_hits:
-            why = f"Matches “{' '.join(intent_tokens[:3])}” — step {i + 1} toward something new."
-        else:
-            why = f"A stretch pick that widens the path from {anchor['name']}."
+        why = _explain_step(
+            anchor, c, intent, i,
+            same_artist=same_artist,
+            intent_hits=intent_hits,
+            intent_tokens=intent_tokens,
+        )
         out.append(
             {
                 "id": c["id"],

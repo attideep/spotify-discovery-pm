@@ -14,7 +14,7 @@
   --border-subtle: rgba(255,255,255,0.1);
   --sidebar-w: 240px;
   --topbar-h: 56px;
-  --player-h: 72px;
+  --player-h: 200px;
   --radius-sm: 4px;
   --radius-md: 8px;
   --radius-lg: 12px;
@@ -1240,6 +1240,23 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   color: var(--text-subdued);
 }
 
+.bridge-loader__progress {
+  width: min(280px, 100%);
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  margin-top: 8px;
+  overflow: hidden;
+}
+
+.bridge-loader__progress-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--green), #509bf5);
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
 @keyframes bridge-spin {
   to { transform: rotate(360deg); }
 }
@@ -1268,16 +1285,150 @@ textarea.form-input { resize: vertical; min-height: 80px; }
 
 .status-toast.visible { opacity: 1; }
 
+/* ── Session reveal + novelty journey ── */
+.session-block {
+  animation: session-in 0.5s ease both;
+}
+
+@keyframes session-in {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.session-summary {
+  color: var(--text-subdued);
+  margin: -8px 0 20px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.novelty-journey {
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: var(--radius-md);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.novelty-journey__labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-subdued);
+  margin-bottom: 12px;
+}
+
+.novelty-journey__track {
+  position: relative;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: visible;
+}
+
+.novelty-journey__fill {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, var(--green) 0%, #509bf5 70%, #8c67ab 100%);
+  border-radius: 3px;
+  transform-origin: left;
+  animation: journey-grow 0.8s ease forwards;
+}
+
+@keyframes journey-grow {
+  from { transform: scaleX(0); }
+  to { transform: scaleX(1); }
+}
+
+.novelty-journey__dot {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  margin-left: -7px;
+  border-radius: 50%;
+  background: var(--text-base);
+  border: 2px solid var(--bg-elevated);
+  box-shadow: 0 0 0 2px rgba(30, 215, 96, 0.35);
+  opacity: 0;
+  animation: dot-pop 0.35s ease forwards;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+
+.novelty-journey__dot:hover { transform: scale(1.2); }
+
+@keyframes dot-pop {
+  from { opacity: 0; transform: scale(0.4); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.track-row--reveal {
+  opacity: 0;
+  transform: translateX(-8px);
+  animation: track-in 0.4s ease forwards;
+}
+
+@keyframes track-in {
+  to { opacity: 1; transform: translateX(0); }
+}
+
+.track-row--active {
+  background: rgba(30, 215, 96, 0.12) !important;
+  box-shadow: inset 3px 0 0 var(--green);
+}
+
+.track-row__novelty-bar {
+  display: block;
+  height: 3px;
+  width: 100%;
+  max-width: 48px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 2px;
+  margin-top: 4px;
+  overflow: hidden;
+}
+
+.track-row__novelty-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--green), #509bf5);
+  border-radius: 2px;
+}
+
 /* ── Preview bar (opens Spotify — not in-app playback) ── */
 .now-playing {
   grid-column: 2;
   background: var(--bg-highlight);
   border-top: 1px solid var(--bg-base);
   display: flex;
+  flex-direction: column;
+  padding: 0;
+  gap: 0;
+}
+
+.now-playing__embed {
+  width: 100%;
+  min-height: 0;
+  background: #181818;
+}
+
+.now-playing__embed iframe {
+  display: block;
+  width: 100%;
+  border: 0;
+  border-radius: 0;
+}
+
+.now-playing__compact {
+  display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
-  gap: 16px;
+  padding: 8px 16px;
+  gap: 12px;
 }
 
 .now-playing__actions {
@@ -1661,11 +1812,15 @@ textarea.form-input { resize: vertical; min-height: 80px; }
   .now-playing {
     grid-row: 2;
     grid-column: 1;
+    padding: 0;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+
+  .now-playing__compact {
     flex-direction: column;
     align-items: stretch;
-    padding: 10px 12px;
-    padding-bottom: max(10px, env(safe-area-inset-bottom, 0));
-    gap: 10px;
+    padding: 8px 12px 10px;
+    gap: 8px;
   }
 
   .now-playing__track {

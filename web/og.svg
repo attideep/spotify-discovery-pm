@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0a1f14"/>
+      <stop offset="50%" stop-color="#121212"/>
+      <stop offset="100%" stop-color="#1a2a3a"/>
+    </linearGradient>
+    <linearGradient id="arc" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#1ed760"/>
+      <stop offset="100%" stop-color="#509bf5"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <circle cx="180" cy="315" r="120" fill="#1ed760" opacity="0.15"/>
+  <circle cx="1020" cy="315" r="160" fill="#509bf5" opacity="0.12"/>
+  <text x="80" y="120" fill="#1ed760" font-family="system-ui,sans-serif" font-size="28" font-weight="600" letter-spacing="4">FREE · NO LOGIN</text>
+  <text x="80" y="220" fill="#ffffff" font-family="system-ui,sans-serif" font-size="72" font-weight="700">Bridge Sessions</text>
+  <text x="80" y="300" fill="#b3b3b3" font-family="system-ui,sans-serif" font-size="36">8 tracks from familiar ’ novel</text>
+  <text x="80" y="360" fill="#b3b3b3" font-family="system-ui,sans-serif" font-size="28">Each step explained · 10k song catalog</text>
+  <rect x="80" y="420" width="1040" height="12" rx="6" fill="rgba(255,255,255,0.1)"/>
+  <rect x="80" y="420" width="1040" height="12" rx="6" fill="url(#arc)"/>
+  <circle cx="120" cy="426" r="18" fill="#1ed760"/>
+  <circle cx="380" cy="426" r="18" fill="#3ddc84"/>
+  <circle cx="640" cy="426" r="18" fill="#6eb5f5"/>
+  <circle cx="900" cy="426" r="18" fill="#509bf5"/>
+  <circle cx="1100" cy="426" r="18" fill="#8c67ab"/>
+  <text x="100" y="500" fill="#666" font-family="system-ui,sans-serif" font-size="22">Familiar</text>
+  <text x="1020" y="500" fill="#666" font-family="system-ui,sans-serif" font-size="22" text-anchor="end">Novel</text>
+</svg>

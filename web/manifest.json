@@ -1,0 +1,17 @@
+{
+  "name": "Bridge Sessions",
+  "short_name": "Bridge",
+  "description": "Gradual music discovery — 8 tracks from familiar to novel, each step explained.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#1ed760",
+  "icons": [
+    {
+      "src": "/static/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

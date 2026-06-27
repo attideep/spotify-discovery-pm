@@ -31,6 +31,23 @@ let isConnected = false;
 let lastSession = null;
 let currentTracks = [];
 let currentTrackIdx = 0;
+let loaderStepTimer = null;
+
+const LOADER_STEPS = [
+  "Finding your anchor…",
+  "Searching 10,000 tracks…",
+  "Scoring familiarity vs novelty…",
+  "Sequencing your bridge…",
+  "Writing step explanations…",
+];
+
+function setGreeting() {
+  const el = document.getElementById("greeting");
+  if (!el) return;
+  const h = new Date().getHours();
+  const word = h < 12 ? "morning" : h < 17 ? "afternoon" : "evening";
+  el.textContent = `Good ${word}`;
+}
 
 function parseHashState() {
   const raw = location.hash.replace("#", "");
@@ -159,6 +176,9 @@ function displaySession(session) {
   lastSession = session;
   const sessionBlock = document.getElementById("sessionBlock");
   sessionBlock.classList.remove("hidden");
+  sessionBlock.classList.remove("session-block");
+  void sessionBlock.offsetWidth;
+  sessionBlock.classList.add("session-block");
   document.getElementById("sessionTitle").textContent = `Bridge from ${session.anchor_track}`;
   document.getElementById("sessionSummary").textContent = session.session_summary;
   document.getElementById("sessionMode").textContent = session.mode === "live" ? "Live beta" : "Free";
@@ -172,7 +192,8 @@ function displaySession(session) {
       plannerEl.classList.add("hidden");
     }
   }
-  renderTracks(session.tracks);
+  renderNoveltyJourney(session.tracks);
+  renderTracks(session.tracks, { animate: true });
 
   const saveBtn = document.getElementById("savePlaylistBtn");
   const shareBtn = document.getElementById("shareBridgeBtn");
@@ -221,12 +242,28 @@ function clearBridgeError() {
 function setBridgeLoading(loading, message = "Building your bridge…") {
   const overlay = document.getElementById("bridgeLoader");
   const title = document.getElementById("bridgeLoaderTitle");
+  const subtitle = document.getElementById("bridgeLoaderSubtitle");
+  const progress = document.getElementById("bridgeLoaderProgress");
   const btn = document.getElementById("buildBtn");
   if (title) title.textContent = message;
   overlay?.classList.toggle("hidden", !loading);
   if (btn) {
     btn.disabled = loading;
     btn.setAttribute("aria-busy", loading ? "true" : "false");
+  }
+  clearInterval(loaderStepTimer);
+  if (loading) {
+    let step = 0;
+    if (progress) progress.style.width = "8%";
+    loaderStepTimer = setInterval(() => {
+      step = (step + 1) % LOADER_STEPS.length;
+      if (title) title.textContent = LOADER_STEPS[step];
+      if (subtitle) subtitle.textContent = `Step ${step + 1} of ${LOADER_STEPS.length}`;
+      if (progress) progress.style.width = `${Math.min(92, 12 + step * 18)}%`;
+    }, 1400);
+  } else {
+    if (progress) progress.style.width = "100%";
+    if (subtitle) subtitle.textContent = "Sequencing tracks from familiar to new";
   }
 }
 
@@ -816,10 +853,47 @@ function trackThumbHtml(t, i) {
   return `<div class="track-row__thumb track-row__thumb--fallback" style="background:${grad}">♪</div>`;
 }
 
+function renderNoveltyJourney(tracks) {
+  const el = document.getElementById("noveltyJourney");
+  if (!el || !tracks?.length) {
+    el?.classList.add("hidden");
+    return;
+  }
+  el.classList.remove("hidden");
+  el.innerHTML = `
+    <div class="novelty-journey__labels"><span>Familiar</span><span>Novel</span></div>
+    <div class="novelty-journey__track">
+      <div class="novelty-journey__fill"></div>
+      ${tracks.map((t, i) => `
+        <button type="button" class="novelty-journey__dot" style="left:${Math.max(4, Math.min(96, (t.novelty_score || (i + 1) / 8) * 100))}%;animation-delay:${0.15 + i * 0.08}s" data-idx="${i}" title="${t.name}"></button>
+      `).join("")}
+    </div>`;
+  el.querySelectorAll(".novelty-journey__dot").forEach(dot => {
+    dot.addEventListener("click", () => {
+      const idx = parseInt(dot.dataset.idx, 10);
+      selectTrack(idx);
+      document.querySelectorAll(".track-row").forEach((row, i) => {
+        row.classList.toggle("track-row--active", i === idx);
+      });
+    });
+  });
+}
+
+function selectTrack(idx) {
+  if (!currentTracks[idx]) return;
+  currentTrackIdx = idx;
+  updatePlayer(currentTracks[idx], idx);
+  document.querySelectorAll(".track-row").forEach((row, i) => {
+    row.classList.toggle("track-row--active", i === idx);
+  });
+}
+
 function updatePlayer(track, idx) {
   const bar = document.getElementById("previewBar");
+  const embed = document.getElementById("playerEmbed");
   if (!track) {
     bar?.classList.add("hidden");
+    if (embed) embed.innerHTML = "";
     return;
   }
   bar?.classList.remove("hidden");
@@ -836,40 +910,52 @@ function updatePlayer(track, idx) {
     artEl.style.backgroundImage = "";
     artEl.style.background = GRADIENTS[idx % GRADIENTS.length];
   }
+  const tid = track.track_id || parseTrackId(track.spotify_url);
+  if (embed && tid) {
+    embed.innerHTML = `<iframe src="https://open.spotify.com/embed/track/${tid}?utm_source=generator&theme=0" height="152" allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture" loading="lazy"></iframe>`;
+  }
 }
 
-function renderTracks(tracks) {
+function renderTracks(tracks, { animate = false } = {}) {
   currentTracks = tracks;
-  document.getElementById("tracks").innerHTML = tracks.map((t, i) => `
-    <div class="track-row" data-idx="${i}" role="button" tabindex="0">
+  const container = document.getElementById("tracks");
+  container.innerHTML = tracks.map((t, i) => `
+    <div class="track-row${animate ? " track-row--reveal" : ""}${i === 0 ? " track-row--active" : ""}" data-idx="${i}" role="button" tabindex="0" style="${animate ? `animation-delay:${i * 0.07}s` : ""}">
       <span class="track-row__idx">${t.position}</span>
       <span class="track-row__play-sm">▶</span>
       <div class="track-row__main">
         ${trackThumbHtml(t, i)}
         <div>
-          <div class="track-row__title">${t.name}</div>
-          <div class="track-row__artist">${t.artist}</div>
+          <div class="track-row__title">${escapeHtml(t.name)}</div>
+          <div class="track-row__artist">${escapeHtml(t.artist)}</div>
         </div>
       </div>
-      <span class="track-row__novelty">${Math.round(t.novelty_score * 100)}% new</span>
+      <span class="track-row__novelty">
+        ${Math.round(t.novelty_score * 100)}%
+        <span class="track-row__novelty-bar"><span class="track-row__novelty-fill" style="width:${Math.round(t.novelty_score * 100)}%"></span></span>
+      </span>
       <span></span>
       <a class="track-row__link" href="${t.spotify_url}" target="_blank" rel="noopener" aria-label="Open in Spotify">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg>
       </a>
     </div>
-    <p class="track-row__bridge-note">${t.explanation}</p>
+    <p class="track-row__bridge-note">${escapeHtml(t.explanation)}</p>
   `).join("");
 
-  document.querySelectorAll(".track-row").forEach(row => {
+  container.querySelectorAll(".track-row").forEach(row => {
     row.addEventListener("click", e => {
       if (e.target.closest("a")) return;
-      const idx = parseInt(row.dataset.idx, 10);
-      currentTrackIdx = idx;
-      updatePlayer(currentTracks[idx], idx);
+      selectTrack(parseInt(row.dataset.idx, 10));
+    });
+    row.addEventListener("keydown", e => {
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        selectTrack(parseInt(row.dataset.idx, 10));
+      }
     });
   });
 
-  if (tracks.length) updatePlayer(tracks[0], 0);
+  if (tracks.length) selectTrack(0);
 }
 
 document.getElementById("comfortLoopCta")?.addEventListener("click", () => {
@@ -911,12 +997,33 @@ document.getElementById("buildBtn")?.addEventListener("click", async () => {
 document.getElementById("shareBridgeBtn")?.addEventListener("click", async () => {
   if (!lastSession) return;
   const url = buildShareUrl(lastSession);
+  const title = `Bridge from ${lastSession.anchor_track}`;
+  const text = `${lastSession.intent} — 8 tracks, each step explained.`;
+  try {
+    if (navigator.share) {
+      await navigator.share({ title, text, url });
+      toast("Thanks for sharing!");
+      return;
+    }
+  } catch (e) {
+    if (e.name === "AbortError") return;
+  }
   try {
     await navigator.clipboard.writeText(url);
     toast("Share link copied!");
   } catch {
     prompt("Copy this link:", url);
   }
+});
+
+document.getElementById("playerPrev")?.addEventListener("click", () => {
+  if (!currentTracks.length) return;
+  selectTrack((currentTrackIdx - 1 + currentTracks.length) % currentTracks.length);
+});
+
+document.getElementById("playerNext")?.addEventListener("click", () => {
+  if (!currentTracks.length) return;
+  selectTrack((currentTrackIdx + 1) % currentTracks.length);
 });
 
 document.getElementById("savePlaylistBtn")?.addEventListener("click", async () => {
@@ -950,6 +1057,7 @@ document.getElementById("playerOpen")?.addEventListener("click", () => {
 });
 
 async function boot() {
+  setGreeting();
   initExampleChips();
   await refreshAuthUI().catch(() => {});
   await tryLoadSharedBridge(INITIAL_HASH.params);
