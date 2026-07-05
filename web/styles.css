@@ -105,6 +105,41 @@ button { font-family: inherit; cursor: pointer; border: none; background: none; 
   }
 }
 
+/* PM dashboard: sidebar + bridge tracks + art panel */
+@media (min-width: 769px) {
+  .app--bridge-enhanced.app--has-player {
+    grid-template-columns: 240px minmax(360px, 520px) 1fr;
+  }
+
+  .app--bridge-enhanced.app--has-player .sidebar {
+    grid-column: 1;
+    grid-row: 1 / -1;
+  }
+
+  .app--bridge-enhanced.app--has-player .main {
+    grid-column: 2;
+    grid-row: 1;
+    min-width: 0;
+  }
+
+  .app--bridge-enhanced.app--has-player .bridge-art-panel:not(.hidden) {
+    grid-column: 3;
+    grid-row: 1 / 3;
+    display: flex;
+  }
+
+  .app--bridge-enhanced.app--has-player .now-playing:not(.hidden) {
+    grid-column: 2;
+    grid-row: 2;
+  }
+}
+
+@media (max-width: 768px) {
+  .app--bridge-enhanced.app--has-player .bridge-art-panel:not(.hidden) {
+    display: none;
+  }
+}
+
 .topbar--bridge-only {
   gap: 12px;
 }

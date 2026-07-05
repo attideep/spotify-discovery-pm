@@ -1,6 +1,7 @@
 const API = window.API_BASE || "";
 const FETCH_OPTS = { credentials: "include" };
 const BRIDGE_ONLY = window.APP_VARIANT === "bridge-only";
+const BRIDGE_ENHANCED = BRIDGE_ONLY || window.BRIDGE_ENHANCED === true;
 
 const EXAMPLE_ANCHORS = [
   { label: "Holocene · Bon Iver", url: "https://open.spotify.com/track/35KiiILklye1JRRctaLUb4" },
@@ -19,6 +20,14 @@ const CONTEXT_INTENTS = [
   { label: "Focus", text: "Focus work — smooth textures, low distraction" },
   { label: "Workout", text: "Workout — build energy as the bridge progresses" },
   { label: "Wind down", text: "Wind down — calmer tracks toward the end" },
+];
+
+const MOOD_INTENTS = [
+  { emoji: "☀️", label: "Morning energy", intent: "Morning energy — gradual lift from my anchor" },
+  { emoji: "🚇", label: "Commute", intent: "Commute — steady energy, gradual novelty from my anchor" },
+  { emoji: "🎯", label: "Focus", intent: "Focus work — smooth textures, low distraction" },
+  { emoji: "🌙", label: "Wind down", intent: "Wind down — calmer tracks toward the end" },
+  { emoji: "✨", label: "Surprise me", intent: "Controlled surprise — safe steps toward something new" },
 ];
 
 const PLANNER_LABELS = {
@@ -334,7 +343,14 @@ function switchTab(tab, { preserveQuery = false } = {}) {
 
   if (tab === "home") {
     history.replaceState(null, "", "/");
+    if (BRIDGE_ENHANCED) {
+      document.getElementById("bridgeArtPanel")?.classList.add("hidden");
+    }
     return;
+  }
+
+  if (BRIDGE_ENHANCED && tab !== "bridge") {
+    document.getElementById("bridgeArtPanel")?.classList.add("hidden");
   }
 
   const query = preserveQuery && location.hash.includes("?")
@@ -420,6 +436,20 @@ function initExampleChips() {
     contextEl.querySelectorAll(".chip").forEach((btn, i) => {
       btn.addEventListener("click", () => {
         document.getElementById("intentInput").value = CONTEXT_INTENTS[i].text;
+      });
+    });
+  }
+
+  const moodEl = document.getElementById("moodChips");
+  if (moodEl) {
+    moodEl.innerHTML = MOOD_INTENTS.map(m =>
+      chipButton(`${m.emoji} ${m.label}`, { tip: m.intent, className: "chip chip--mood", attrs: { intent: m.intent } })
+    ).join("");
+    moodEl.querySelectorAll(".chip--mood").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const input = document.getElementById("intentInput");
+        if (input) input.value = btn.dataset.intent;
+        input?.focus();
       });
     });
   }
@@ -957,7 +987,8 @@ async function updatePlayer(track, idx) {
 }
 
 function updateBridgeArtPanel(track, idx) {
-  if (!BRIDGE_ONLY) return;
+  if (!BRIDGE_ENHANCED) return;
+  if (!BRIDGE_ONLY && !document.getElementById("panel-bridge")?.classList.contains("active")) return;
   const panel = document.getElementById("bridgeArtPanel");
   if (!panel) return;
   if (!track) {
@@ -1004,8 +1035,8 @@ function renderTracks(tracks, { animate = false } = {}) {
   const container = document.getElementById("tracks");
   if (!container) return;
   container.innerHTML = tracks.map((t, i) => `
-    <div class="track-entry${BRIDGE_ONLY ? " track-entry--customer" : ""}">
-    <div class="track-row${animate ? " track-row--reveal" : ""}${i === 0 ? " track-row--active" : ""}${BRIDGE_ONLY ? " track-row--customer" : ""}" data-idx="${i}" role="button" tabindex="0" style="${animate ? `animation-delay:${i * 0.07}s` : ""}">
+    <div class="track-entry${BRIDGE_ENHANCED ? " track-entry--customer" : ""}">
+    <div class="track-row${animate ? " track-row--reveal" : ""}${i === 0 ? " track-row--active" : ""}${BRIDGE_ENHANCED ? " track-row--customer" : ""}" data-idx="${i}" role="button" tabindex="0" style="${animate ? `animation-delay:${i * 0.07}s` : ""}">
       <span class="track-row__idx">${t.position}</span>
       <span class="track-row__play-sm">▶</span>
       <div class="track-row__main">
@@ -1019,7 +1050,7 @@ function renderTracks(tracks, { animate = false } = {}) {
         ${Math.round(t.novelty_score * 100)}%
         <span class="track-row__novelty-bar"><span class="track-row__novelty-fill" style="width:${Math.round(t.novelty_score * 100)}%"></span></span>
       </span>
-      ${BRIDGE_ONLY ? "" : `<a class="track-row__link" href="${t.spotify_url}" target="_blank" rel="noopener" aria-label="Open in Spotify">
+      ${BRIDGE_ENHANCED ? "" : `<a class="track-row__link" href="${t.spotify_url}" target="_blank" rel="noopener" aria-label="Open in Spotify">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg>
       </a>`}
     </div>

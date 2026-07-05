@@ -31,9 +31,10 @@
   </style>
   <link rel="stylesheet" href="/static/styles.css" />
   <link rel="stylesheet" href="/static/player.css" />
+  <link rel="stylesheet" href="/static/customer.css" />
 </head>
 <body>
-  <div class="app">
+  <div class="app app--bridge-enhanced">
     <!-- Sidebar -->
     <aside class="sidebar">
       <div class="sidebar__logo">
@@ -60,8 +61,6 @@
           <span>Ask Corpus</span>
         </button>
       </nav>
-
-      <a href="/app" class="sidebar__customer-link" target="_blank" rel="noopener">Customer view ↗</a>
     </aside>
 
     <!-- Main -->
@@ -152,6 +151,8 @@
             </div>
             <div id="anchorPreview" class="anchor-preview hidden"></div>
             <div class="chip-row chip-row--compact" id="anchorChips"></div>
+            <label class="form-label">Your vibe</label>
+            <div class="chip-row chip-row--compact mood-chips" id="moodChips"></div>
             <label class="form-label">Your intent</label>
             <textarea class="form-input" id="intentInput" rows="2" placeholder="Like Khruangbin but more energetic for a morning run"></textarea>
             <label class="form-label">Listening context</label>
@@ -173,19 +174,21 @@
           </div>
 
           <div id="sessionBlock" class="session-block hidden">
-            <div class="section-header">
-              <h2 id="sessionTitle">Your bridge</h2>
-              <div class="session-header-actions">
-                <span id="sessionMode" class="sidebar__badge"></span>
-                <span id="sessionPlanner" class="sidebar__badge sidebar__badge--muted hidden"></span>
-                <button type="button" id="shareBridgeBtn" class="btn-spotify btn-spotify--ghost btn-spotify--sm hidden">Share bridge</button>
+            <div class="session-head session-head--customer">
+              <div class="session-head__row">
+                <h2 id="sessionTitle" class="session-head__title">Your bridge</h2>
+                <div class="session-toolbar">
+                  <span id="sessionMode" class="sidebar__badge"></span>
+                  <span id="sessionPlanner" class="sidebar__badge sidebar__badge--muted hidden"></span>
+                  <button type="button" id="shareBridgeBtn" class="btn-spotify btn-spotify--outline btn-spotify--sm hidden">Share</button>
+                </div>
               </div>
+              <p id="sessionSummary" class="session-summary"></p>
             </div>
-            <p id="sessionSummary" class="session-summary"></p>
             <div id="bridgeStats" class="bridge-stats hidden" aria-label="Bridge session stats"></div>
             <div id="noveltyJourney" class="novelty-journey hidden" aria-label="Novelty arc from familiar to novel"></div>
             <div class="track-list-header">
-              <span>#</span><span>Title</span><span>Novelty</span><span></span><span></span>
+              <span>#</span><span>Title</span><span>Novelty</span><span></span>
             </div>
             <div id="tracks"></div>
           </div>
@@ -216,39 +219,54 @@
       </div>
     </div>
 
-    <!-- Custom bridge player — 30s previews via Web Audio (volume + EQ) -->
+    <aside id="bridgeArtPanel" class="bridge-art-panel hidden" aria-hidden="true">
+      <div class="bridge-art-panel__bg" id="bridgeArtBg"></div>
+      <div class="bridge-art-panel__content">
+        <div class="bridge-art-panel__art" id="bridgeArtHero"></div>
+        <div class="bridge-art-panel__meta">
+          <p class="bridge-art-panel__step" id="bridgeArtStep"></p>
+          <h2 class="bridge-art-panel__title" id="bridgeArtTitle"></h2>
+          <p class="bridge-art-panel__artist" id="bridgeArtArtist"></p>
+          <p class="bridge-art-panel__note" id="bridgeArtNote"></p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Custom bridge player — 30s previews -->
     <footer class="now-playing hidden" id="previewBar">
-      <div class="bridge-player">
-        <canvas id="eqCanvas" class="bridge-player__eq" aria-hidden="true"></canvas>
+      <div class="bridge-player bridge-player--minimal">
         <div class="bridge-player__row">
-          <div class="now-playing__art bridge-player__art" id="playerArt"></div>
-          <div class="bridge-player__meta">
-            <div class="now-playing__title" id="playerTitle">Tap a track to preview</div>
-            <div class="now-playing__artist" id="playerArtist">Bridge Sessions</div>
-            <span class="bridge-player__badge" id="playerBadge">30s preview · Full song in Spotify</span>
+          <div class="bridge-player__track">
+            <div class="now-playing__art bridge-player__art" id="playerArt"></div>
+            <div class="bridge-player__meta">
+              <div class="now-playing__title" id="playerTitle">Tap a track to preview</div>
+              <div class="now-playing__artist" id="playerArtist">Bridge Sessions</div>
+            </div>
           </div>
-          <div class="bridge-player__controls">
-            <button type="button" class="bridge-player__play" id="playerPlayBtn" aria-label="Play or pause">▶</button>
-            <button type="button" class="bridge-player__nav" id="playerPrev" aria-label="Previous">‹</button>
-            <button type="button" class="bridge-player__nav" id="playerNext" aria-label="Next">›</button>
-          </div>
-          <div class="bridge-player__volume">
-            <label for="playerVolume" class="sr-only">Volume</label>
-            <span aria-hidden="true">🔊</span>
-            <input type="range" id="playerVolume" min="0" max="100" value="85" />
-            <span id="playerVolumeLabel" class="bridge-player__vol-label">85%</span>
+          <button type="button" class="bridge-player__spotify-btn" id="playerOpen" title="Open full song in Spotify">Spotify ↗</button>
+          <div class="bridge-player__transport">
+            <div class="bridge-player__controls">
+              <button type="button" class="bridge-player__play" id="playerPlayBtn" aria-label="Play or pause">▶</button>
+              <button type="button" class="bridge-player__nav" id="playerPrev" aria-label="Previous">‹</button>
+              <button type="button" class="bridge-player__nav" id="playerNext" aria-label="Next">›</button>
+            </div>
+            <div class="bridge-player__volume">
+              <label for="playerVolume" class="sr-only">Volume</label>
+              <span class="bridge-player__vol-icon" aria-hidden="true">🔊</span>
+              <input type="range" id="playerVolume" min="0" max="100" value="85" />
+              <span id="playerVolumeLabel" class="bridge-player__vol-label">85%</span>
+            </div>
           </div>
           <div class="bridge-player__actions">
             <span class="now-playing__step" id="playerStep"></span>
             <button type="button" class="chip chip--sm" id="playerTourBtn">Auto tour</button>
-            <button type="button" class="btn-spotify btn-spotify--ghost btn-spotify--sm" id="playerOpen">Full song</button>
             <button type="button" class="bridge-player__menu" id="playerMenuBtn" aria-label="Player menu">⋯</button>
           </div>
         </div>
-        <div class="bridge-player__eq-sliders">
-          <label class="bridge-player__eq-label">Bass <input type="range" id="eqBass" min="-12" max="12" value="0" aria-label="Bass" /></label>
-          <label class="bridge-player__eq-label">Mid <input type="range" id="eqMid" min="-12" max="12" value="0" aria-label="Mid" /></label>
-          <label class="bridge-player__eq-label">Treble <input type="range" id="eqTreble" min="-12" max="12" value="0" aria-label="Treble" /></label>
+        <div class="bridge-player__seek">
+          <span class="bridge-player__time" id="playerTimeCurrent">0:00</span>
+          <input type="range" id="playerSeek" min="0" max="1000" value="0" aria-label="Seek preview" />
+          <span class="bridge-player__time" id="playerTimeDur">0:30</span>
         </div>
         <div id="playerMenu" class="bridge-player__menu-panel hidden">
           <button type="button" data-legal="termsModal">Terms of use</button>
@@ -300,6 +318,7 @@
   </div>
 
   <div class="status-toast" id="statusToast"></div>
+  <script>window.BRIDGE_ENHANCED = true; window.PLAYER_MINIMAL = true;</script>
   <script src="/static/player.js"></script>
   <script src="/static/legal.js"></script>
   <script src="/static/app.js"></script>
