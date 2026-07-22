@@ -40,6 +40,10 @@ CREATE INDEX IF NOT EXISTS idx_saved_bridges_user ON saved_bridges(user_id, crea
 _user_schema_ready = False
 
 
+def _postgres_configured() -> bool:
+    return bool(get_settings().database_url.strip())
+
+
 def _sqlite_path() -> Path:
     """Vercel serverless has a read-only project dir; only /tmp is writable."""
     if os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"):
@@ -72,7 +76,7 @@ def _sqlite_conn() -> sqlite3.Connection:
 
 
 def storage_mode() -> str:
-    if get_settings().database_url.strip():
+    if _postgres_configured():
         return "postgres"
     if os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"):
         return "sqlite-ephemeral"
@@ -85,18 +89,11 @@ def ensure_user_schema() -> bool:
         return True
 
     pg = _pg_conn()
-    if pg:
+    if _postgres_configured():
+        if not pg:
+            return False
         try:
             with pg, pg.cursor() as cur:
-                cur.execute(
-                    """
-                    SELECT 1 FROM information_schema.tables
-                    WHERE table_schema = 'public' AND table_name = 'app_users'
-                    """
-                )
-                if cur.fetchone():
-                    _user_schema_ready = True
-                    return True
                 cur.execute(_USER_SCHEMA_PG)
             _user_schema_ready = True
             return True
@@ -182,6 +179,8 @@ def create_user(
             return None
         finally:
             pg.close()
+    if _postgres_configured():
+        return None
 
     try:
         conn = _sqlite_conn()
@@ -217,6 +216,8 @@ def get_user_by_email(email: str) -> dict[str, Any] | None:
             return _user_row(r, include_hash=True) if r else None
         finally:
             pg.close()
+    if _postgres_configured():
+        return None
     conn = _sqlite_conn()
     r = conn.execute(
         "SELECT id, email, password_hash, display_name, google_id, avatar_url, created_at FROM app_users WHERE email = ?",
@@ -241,6 +242,8 @@ def get_user_by_id(user_id: str) -> dict[str, Any] | None:
             return _public_user(r) if r else None
         finally:
             pg.close()
+    if _postgres_configured():
+        return None
     conn = _sqlite_conn()
     r = conn.execute(
         "SELECT id, email, display_name, google_id, avatar_url, created_at FROM app_users WHERE id = ?",
@@ -265,6 +268,8 @@ def get_user_by_google_id(google_id: str) -> dict[str, Any] | None:
             return _user_row(r, include_hash=True) if r else None
         finally:
             pg.close()
+    if _postgres_configured():
+        return None
     conn = _sqlite_conn()
     r = conn.execute(
         "SELECT id, email, password_hash, display_name, google_id, avatar_url, created_at FROM app_users WHERE google_id = ?",
@@ -310,6 +315,8 @@ def save_bridge(user_id: str, session: dict[str, Any]) -> dict[str, Any] | None:
             return None
         finally:
             pg.close()
+    if _postgres_configured():
+        return None
 
     try:
         conn = _sqlite_conn()
@@ -355,6 +362,8 @@ def list_saved_bridges(user_id: str, *, limit: int = 20) -> list[dict[str, Any]]
             return [_saved_row(r) for r in rows]
         finally:
             pg.close()
+    if _postgres_configured():
+        return []
     conn = _sqlite_conn()
     rows = conn.execute(
         """
@@ -385,6 +394,8 @@ def get_saved_bridge(user_id: str, bridge_id: str) -> dict[str, Any] | None:
             return _saved_row(r) if r else None
         finally:
             pg.close()
+    if _postgres_configured():
+        return None
     conn = _sqlite_conn()
     r = conn.execute(
         """
@@ -408,6 +419,8 @@ def delete_saved_bridge(user_id: str, bridge_id: str) -> bool:
                 return cur.rowcount > 0
         finally:
             pg.close()
+    if _postgres_configured():
+        return False
     conn = _sqlite_conn()
     with conn:
         cur = conn.execute("DELETE FROM saved_bridges WHERE user_id = ? AND id = ?", (user_id, bridge_id))
