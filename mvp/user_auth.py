@@ -145,9 +145,11 @@ def exchange_google_code(code: str) -> tuple[dict[str, Any] | None, str | None]:
         return None, "Google sign-in timed out."
 
     google_id = profile.get("sub")
-    email = (profile.get("email") or "").lower()
+    email = (profile.get("email") or "").strip().lower()
     if not google_id or not email:
         return None, "Google account missing email."
+    if profile.get("email_verified") is not True:
+        return None, "Google account email is not verified."
 
     existing = get_user_by_google_id(google_id)
     if existing:
