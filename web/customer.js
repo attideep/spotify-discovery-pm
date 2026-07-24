@@ -165,10 +165,18 @@
     return [...byId.values()].sort((a, b) => String(b.created_at).localeCompare(String(a.created_at)));
   }
 
+  function canUseLocalLibraryFallback() {
+    return storageMode !== "postgres" || Boolean(authUser?._localAuth);
+  }
+
+  function shouldPreferServerLibrary(serverAvailable) {
+    return storageMode === "postgres" && serverAvailable && !authUser?._localAuth;
+  }
+
   function renderStorageNote(mode) {
     const note = $("libraryStorageNote");
     if (!note) return;
-    if (mode === "postgres") {
+    if (mode === "postgres" && !authUser?._localAuth) {
       note.textContent = "Saved bridges — synced to your account across devices.";
       return;
     }
@@ -190,7 +198,7 @@
           const trackCount = (b.tracks || []).length;
           const date = formatBridgeDate(b.created_at);
           const intent = b.intent || "";
-          const localBadge = b._local && storageMode !== "postgres" ? '<span class="saved-bridge-card__badge">This device</span>' : "";
+          const localBadge = b._local ? '<span class="saved-bridge-card__badge">This device</span>' : "";
           return `
           <div class="saved-bridge-card" data-id="${escapeHtml(b.id)}">
             <button type="button" class="saved-bridge-card__open" data-id="${escapeHtml(b.id)}" title="${escapeHtml(b.title || b.anchor_track)}" aria-label="${escapeHtml(b.title || b.anchor_track)}">
@@ -497,7 +505,7 @@
           throw new Error("Could not save bridge — try again.");
         }
         if (!r.ok) {
-          if (storageMode !== "postgres" && authUser) {
+          if (authUser && canUseLocalLibraryFallback()) {
             mirrorBridgeLocal(window.lastSession);
             this.markSessionSaved();
             window.toast?.("Saved on this device");
@@ -527,8 +535,8 @@
         await this.loadSavedBridges();
         return;
       }
-      removeLocalBridge(id);
       if (!authUser) {
+        removeLocalBridge(id);
         await this.loadSavedBridges();
         return;
       }
@@ -564,13 +572,17 @@
       panel?.classList.remove("hidden");
       el.innerHTML = `<div class="saved-bridges__loading"><span class="search-results__spinner"></span>Loading library…</div>`;
       let serverBridges = [];
+      let serverAvailable = false;
       if (authUser) {
         try {
-          const data = await fetch("/api/bridges/saved", { credentials: "include" }).then(r => r.json());
+          const r = await fetch("/api/bridges/saved", { credentials: "include" });
+          if (!r.ok) throw new Error("Could not load saved bridges");
+          const data = await r.json();
           serverBridges = data.bridges || [];
+          serverAvailable = true;
         } catch { /* fall back to local */ }
       }
-      const bridges = storageMode === "postgres"
+      const bridges = shouldPreferServerLibrary(serverAvailable)
         ? serverBridges
         : mergeLibraries(serverBridges, local);
       if (countEl) countEl.textContent = bridges.length ? String(bridges.length) : "";
