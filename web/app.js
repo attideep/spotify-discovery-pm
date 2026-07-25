@@ -364,7 +364,12 @@ function escapeHtml(text) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function cssUrl(url) {
+  return `url(${JSON.stringify(String(url || ""))})`;
 }
 
 function chipLabel(text, max = 36) {
@@ -498,14 +503,14 @@ function renderSearchResultsHtml(tracks, hint) {
     return `<div class="search-results__hint">No tracks found — try the song title or artist name.</div>`;
   }
   return tracks.map(t => `
-    <button type="button" class="search-result" data-url="${t.spotify_url}" data-id="${t.id}">
-      ${t.album_art ? `<img class="search-result__art" src="${t.album_art}" alt="" loading="lazy" />` : `<div class="search-result__art"></div>`}
+    <button type="button" class="search-result" data-url="${escapeHtml(t.spotify_url || "")}" data-id="${escapeHtml(t.id || "")}">
+      ${t.album_art ? `<img class="search-result__art" src="${escapeHtml(t.album_art)}" alt="" loading="lazy" />` : `<div class="search-result__art"></div>`}
       <div class="search-result__meta">
-        <div class="search-result__title">${t.name}</div>
-        <div class="search-result__artist">${t.artist || "Spotify"}</div>
+        <div class="search-result__title">${escapeHtml(t.name || "")}</div>
+        <div class="search-result__artist">${escapeHtml(t.artist || "Spotify")}</div>
       </div>
     </button>
-  `).join("") + (hint ? `<div class="search-results__hint">${hint}</div>` : "");
+  `).join("") + (hint ? `<div class="search-results__hint">${escapeHtml(hint)}</div>` : "");
 }
 
 async function previewAnchor() {
@@ -592,18 +597,18 @@ function showThemeDetail(theme) {
   const detail = document.getElementById("themeDetail");
   detail.classList.remove("hidden");
   const quotes = (theme.exemplars || []).slice(0, 3).map(ex => `
-    <blockquote class="theme-detail__quote">"${ex.text}"${ex.url ? ` — <a href="${ex.url}" target="_blank" rel="noopener">source</a>` : ""}</blockquote>
+    <blockquote class="theme-detail__quote">"${escapeHtml(ex.text || "")}"${ex.url ? ` — <a href="${escapeHtml(ex.url)}" target="_blank" rel="noopener">source</a>` : ""}</blockquote>
   `).join("") || `<p class="theme-detail__empty">No sample quotes loaded for this theme.</p>`;
 
   detail.innerHTML = `
     <div class="theme-detail__head">
       <div>
-        <h3 class="theme-detail__title">${themeLabel(theme.theme)}</h3>
-        <p class="theme-detail__meta">${theme.pct}% of reviews · ${theme.count} mentions</p>
+        <h3 class="theme-detail__title">${escapeHtml(themeLabel(theme.theme))}</h3>
+        <p class="theme-detail__meta">${escapeHtml(theme.pct)}% of reviews · ${escapeHtml(theme.count)} mentions</p>
       </div>
       <button type="button" class="theme-detail__close" aria-label="Close">&times;</button>
     </div>
-    <p class="theme-detail__summary">${theme.summary}</p>
+    <p class="theme-detail__summary">${escapeHtml(theme.summary || "")}</p>
     <div class="theme-detail__quotes">${quotes}</div>
     <div class="chip-row chip-row--compact">
       <button type="button" class="chip" data-action="ask-theme">Ask about this theme</button>
@@ -640,14 +645,14 @@ function showSegmentDetail(key, count, total) {
   detail.innerHTML = `
     <div class="theme-detail__head">
       <div>
-        <h3 class="theme-detail__title">${label}</h3>
-        <p class="theme-detail__meta">${pct}% of corpus · ${count} reviews</p>
+        <h3 class="theme-detail__title">${escapeHtml(label)}</h3>
+        <p class="theme-detail__meta">${escapeHtml(pct)}% of corpus · ${escapeHtml(count)} reviews</p>
       </div>
       <button type="button" class="theme-detail__close" aria-label="Close">&times;</button>
     </div>
     <p class="theme-detail__summary">Users in this segment describe discovery differently — bridge sessions can target their specific friction.</p>
     <div class="chip-row chip-row--compact">
-      <button type="button" class="chip" data-action="ask-segment">Ask about ${label}</button>
+      <button type="button" class="chip" data-action="ask-segment">Ask about ${escapeHtml(label)}</button>
       <button type="button" class="chip" data-action="bridge-segment">Bridge for this segment</button>
     </div>`;
 
@@ -679,13 +684,13 @@ function renderThemes(themes, targetId = "themes") {
   const el = document.getElementById(targetId);
   if (!el) return;
   el.innerHTML = themes.slice(0, 8).map(t => `
-    <button type="button" class="theme-card" data-theme="${t.theme}" aria-pressed="false">
+    <button type="button" class="theme-card" data-theme="${escapeHtml(t.theme)}" aria-pressed="false">
       <div class="theme-card__head">
-        <span class="theme-card__name">${themeLabel(t.theme)}</span>
-        <span class="theme-card__pct">${t.pct}%</span>
+        <span class="theme-card__name">${escapeHtml(themeLabel(t.theme))}</span>
+        <span class="theme-card__pct">${escapeHtml(t.pct)}%</span>
       </div>
       <div class="theme-card__bar"><div class="theme-card__fill" style="width:${Math.min(t.pct * 2.5, 100)}%"></div></div>
-      <p class="theme-card__summary">${t.summary}</p>
+      <p class="theme-card__summary">${escapeHtml(t.summary || "")}</p>
     </button>
   `).join("");
 
@@ -715,10 +720,10 @@ function renderHomeThemes(themes) {
   el.innerHTML = themes.slice(0, 6).map((t, i) => `
     <article class="media-card" data-tab="insights">
       <div class="media-card__cover">
-        <div class="cover-gradient" style="background:${colors[i % colors.length]}">${Math.round(t.pct)}%</div>
+        <div class="cover-gradient" style="background:${colors[i % colors.length]}">${escapeHtml(Math.round(t.pct))}%</div>
       </div>
-      <p class="media-card__title">${t.theme.replace(/_/g, " ")}</p>
-      <p class="media-card__desc">${t.summary.slice(0, 56)}…</p>
+      <p class="media-card__title">${escapeHtml(t.theme.replace(/_/g, " "))}</p>
+      <p class="media-card__desc">${escapeHtml((t.summary || "").slice(0, 56))}…</p>
     </article>
   `).join("");
   el.querySelectorAll(".media-card").forEach(c => {
@@ -735,10 +740,10 @@ function renderSegments(segments) {
     .map(([k, v]) => {
       const pct = Math.round(100 * v / total);
       return `
-        <button type="button" class="segment-chip" data-segment="${k}" aria-pressed="false">
-          <span style="min-width:140px;text-transform:capitalize">${themeLabel(k)}</span>
+        <button type="button" class="segment-chip" data-segment="${escapeHtml(k)}" aria-pressed="false">
+          <span style="min-width:140px;text-transform:capitalize">${escapeHtml(themeLabel(k))}</span>
           <div class="segment-chip__bar-wrap"><div class="segment-chip__bar" style="width:${pct}%"></div></div>
-          <span style="color:var(--text-subdued);font-size:13px">${pct}%</span>
+          <span style="color:var(--text-subdued);font-size:13px">${escapeHtml(pct)}%</span>
         </button>`;
     }).join("");
 
@@ -799,7 +804,7 @@ async function loadInsights() {
 
   const btns = document.getElementById("canonicalBtns");
   btns.innerHTML = Object.entries(data.canonical_questions).map(([k, q]) =>
-    `<button class="chip" data-key="${k}">${q.length > 42 ? q.slice(0, 42) + "…" : q}</button>`
+    `<button class="chip" data-key="${escapeHtml(k)}">${escapeHtml(q.length > 42 ? q.slice(0, 42) + "…" : q)}</button>`
   ).join("");
   btns.querySelectorAll(".chip").forEach(btn => {
     btn.addEventListener("click", async () => {
@@ -915,7 +920,7 @@ const GRADIENTS = [
 function trackThumbHtml(t, i) {
   const grad = GRADIENTS[i % GRADIENTS.length];
   if (t.album_art) {
-    return `<div class="track-row__thumb"><img src="${t.album_art}" alt="" loading="lazy" onerror="this.parentElement.classList.add('track-row__thumb--fallback');this.parentElement.style.background='${grad}';this.replaceWith(document.createTextNode('♪'));" /></div>`;
+    return `<div class="track-row__thumb"><img src="${escapeHtml(t.album_art)}" alt="" loading="lazy" onerror="this.parentElement.classList.add('track-row__thumb--fallback');this.parentElement.style.background='${grad}';this.replaceWith(document.createTextNode('♪'));" /></div>`;
   }
   return `<div class="track-row__thumb track-row__thumb--fallback" style="background:${grad}">♪</div>`;
 }
@@ -1013,9 +1018,9 @@ function updateBridgeArtPanel(track, idx) {
     void artEl.offsetWidth;
     if (track.album_art) {
       artEl.style.background = "";
-      artEl.style.backgroundImage = `url("${track.album_art}")`;
+      artEl.style.backgroundImage = cssUrl(track.album_art);
       if (bgEl) {
-        bgEl.style.backgroundImage = `url("${track.album_art}")`;
+        bgEl.style.backgroundImage = cssUrl(track.album_art);
         bgEl.classList.remove("hidden");
       }
     } else {
@@ -1050,7 +1055,7 @@ function renderTracks(tracks, { animate = false } = {}) {
         ${Math.round(t.novelty_score * 100)}%
         <span class="track-row__novelty-bar"><span class="track-row__novelty-fill" style="width:${Math.round(t.novelty_score * 100)}%"></span></span>
       </span>
-      ${BRIDGE_ENHANCED ? "" : `<a class="track-row__link" href="${t.spotify_url}" target="_blank" rel="noopener" aria-label="Open in Spotify">
+      ${BRIDGE_ENHANCED ? "" : `<a class="track-row__link" href="${escapeHtml(t.spotify_url || "")}" target="_blank" rel="noopener" aria-label="Open in Spotify">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg>
       </a>`}
     </div>
