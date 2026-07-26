@@ -81,6 +81,9 @@
     const norm = normalizeEmail(email);
     const existing = getLocalAuth();
     if (existing && normalizeEmail(existing.email) === norm) {
+      if (!await verifyLocalPassword(email, password)) {
+        throw new Error("Account exists on this device — sign in with the existing password.");
+      }
       const pwHash = await hashCredentials(email, password);
       saveLocalAuth({
         id: existing.id,
