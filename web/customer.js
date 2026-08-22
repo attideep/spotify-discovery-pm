@@ -16,6 +16,7 @@
   const LOCAL_ID_PREFIX = "local:";
 
   let authUser = null;
+  let serverAuthed = false;
   let sessionSaved = false;
   let storageMode = "sqlite-ephemeral";
 
@@ -77,6 +78,21 @@
     return hash === acc.pwHash;
   }
 
+  function localLibraryKey(user = authUser) {
+    const owner = normalizeEmail(user?.email) || String(user?.id || "");
+    return owner ? `${LOCAL_LIB_KEY}:${owner}` : null;
+  }
+
+  function readLocalLibrary(key) {
+    if (!key) return [];
+    try {
+      const raw = localStorage.getItem(key);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+
   async function createLocalAccount(email, password, display_name) {
     const norm = normalizeEmail(email);
     const existing = getLocalAuth();
@@ -121,22 +137,19 @@
   }
 
   function getLocalLibrary() {
-    try {
-      const raw = localStorage.getItem(LOCAL_LIB_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
+    return readLocalLibrary(localLibraryKey());
   }
 
   function setLocalLibrary(bridges) {
+    const key = localLibraryKey();
+    if (!key) return;
     try {
-      localStorage.setItem(LOCAL_LIB_KEY, JSON.stringify(bridges.slice(0, 40)));
+      localStorage.setItem(key, JSON.stringify(bridges.slice(0, 40)));
     } catch { /* ignore */ }
   }
 
   function mirrorBridgeLocal(session, serverId) {
-    if (!session?.tracks?.length) return;
+    if (!authUser || !session?.tracks?.length) return;
     const id = serverId ? String(serverId) : `${LOCAL_ID_PREFIX}${Date.now()}`;
     const entry = {
       id,
@@ -147,6 +160,8 @@
       session_summary: session.session_summary || "",
       tracks: session.tracks,
       created_at: new Date().toISOString(),
+      owner_email: normalizeEmail(authUser.email),
+      owner_id: authUser.id || "",
       _local: true,
     };
     const lib = getLocalLibrary().filter(b => b.id !== id);
@@ -168,6 +183,10 @@
   function renderStorageNote(mode) {
     const note = $("libraryStorageNote");
     if (!note) return;
+    if (authUser && !serverAuthed) {
+      note.textContent = "Saved bridges — kept on this device until you sign in again.";
+      return;
+    }
     if (mode === "postgres") {
       note.textContent = "Saved bridges — synced to your account across devices.";
       return;
@@ -190,7 +209,7 @@
           const trackCount = (b.tracks || []).length;
           const date = formatBridgeDate(b.created_at);
           const intent = b.intent || "";
-          const localBadge = b._local && storageMode !== "postgres" ? '<span class="saved-bridge-card__badge">This device</span>' : "";
+          const localBadge = b._local && (!serverAuthed || storageMode !== "postgres") ? '<span class="saved-bridge-card__badge">This device</span>' : "";
           return `
           <div class="saved-bridge-card" data-id="${escapeHtml(b.id)}">
             <button type="button" class="saved-bridge-card__open" data-id="${escapeHtml(b.id)}" title="${escapeHtml(b.title || b.anchor_track)}" aria-label="${escapeHtml(b.title || b.anchor_track)}">
@@ -227,9 +246,11 @@
           window.toast?.("Server session expired — using your account on this device.");
         }
         if (data.logged_in && data.user) {
+          serverAuthed = true;
           authUser = data.user;
         } else {
           const local = getLocalAuth();
+          serverAuthed = false;
           authUser = local?.active ? localUserFromAuth(local) : null;
         }
         this._renderAuthUI({ logged_in: Boolean(authUser), user: authUser });
@@ -247,8 +268,10 @@
         return data;
       } catch {
         const local = getLocalAuth();
+        serverAuthed = false;
         authUser = local?.active ? localUserFromAuth(local) : null;
         this._renderAuthUI({ logged_in: Boolean(authUser), user: authUser });
+        renderStorageNote(storageMode);
         this._renderLibraryHint();
         this._renderSessionLostBanner({});
         this.renderContinueCard();
@@ -279,16 +302,10 @@
         signedIn.classList.add("hidden");
         libraryNav?.classList.add("hidden");
         if (saveBtn) saveBtn.classList.add("hidden");
-        const local = getLocalLibrary();
-        if (local.length) {
-          libraryPanel?.classList.remove("hidden");
-          libraryHint?.classList.add("hidden");
-          this.loadSavedBridges();
-        } else {
-          libraryPanel?.classList.add("hidden");
-          libraryHint?.classList.remove("hidden");
-          $("savedBridges")?.replaceChildren();
-        }
+        libraryPanel?.classList.add("hidden");
+        libraryHint?.classList.remove("hidden");
+        $("savedBridges")?.replaceChildren();
+        if ($("libraryCount")) $("libraryCount").textContent = "";
       }
     },
 
@@ -301,7 +318,13 @@
     _renderSessionLostBanner(data) {
       const banner = $("sessionLostBanner");
       if (!banner) return;
-      const show = Boolean(data.session_lost) && !authUser;
+      const show = Boolean(data.session_lost) || (Boolean(authUser) && !serverAuthed && storageMode === "postgres");
+      const text = banner.querySelector(".session-lost-banner__text");
+      if (text && show) {
+        text.textContent = authUser
+          ? "You are using this device only. Sign in again to sync and open your server library."
+          : "Your session ended — sign in again to open your library. Saved bridges on this device are still kept in your browser.";
+      }
       banner.classList.toggle("hidden", !show);
     },
 
@@ -375,7 +398,7 @@
       }
 
       const finishAuth = async (user, message) => {
-        authUser = { ...user, _localAuth: storageMode !== "postgres" };
+        authUser = user;
         setLocalAuthActive(true);
         this.closeAuth();
         $("authPassword").value = "";
@@ -471,6 +494,7 @@
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => {});
       setLocalAuthActive(false);
       authUser = null;
+      serverAuthed = false;
       sessionSaved = false;
       await this.refreshAuth();
       window.toast?.("Signed out");
@@ -482,7 +506,19 @@
       if (sessionSaved) return window.toast?.("Already in your library");
       const saveBtn = $("saveBridgeBtn");
       if (saveBtn) saveBtn.disabled = true;
+      const saveOnDevice = async (message = "Saved on this device") => {
+        mirrorBridgeLocal(window.lastSession);
+        this.markSessionSaved();
+        renderStorageNote(storageMode);
+        window.toast?.(message);
+        await this.loadSavedBridges();
+        setTimeout(() => this.scrollToLibrary(), 300);
+      };
       try {
+        if (!serverAuthed) {
+          await saveOnDevice("Saved on this device. Sign in again to sync.");
+          return;
+        }
         const r = await fetch("/api/bridges/save", {
           method: "POST",
           credentials: "include",
@@ -497,12 +533,11 @@
           throw new Error("Could not save bridge — try again.");
         }
         if (!r.ok) {
-          if (storageMode !== "postgres" && authUser) {
-            mirrorBridgeLocal(window.lastSession);
-            this.markSessionSaved();
-            window.toast?.("Saved on this device");
-            await this.loadSavedBridges();
-            setTimeout(() => this.scrollToLibrary(), 300);
+          if (r.status === 401) serverAuthed = false;
+          if (authUser) {
+            await saveOnDevice(storageMode === "postgres"
+              ? "Server session expired — saved on this device."
+              : "Saved on this device");
             return;
           }
           throw new Error(data.detail || data.error || "Save failed");
@@ -513,6 +548,11 @@
         await this.loadSavedBridges();
         setTimeout(() => this.scrollToLibrary(), 300);
       } catch (e) {
+        if (authUser) {
+          serverAuthed = false;
+          await saveOnDevice("Server unavailable — saved on this device.");
+          return;
+        }
         if (saveBtn) saveBtn.disabled = false;
         window.toast?.(e.message);
       }
@@ -521,7 +561,7 @@
     async deleteSavedBridge(id, cardEl) {
       if (!id) return;
       const isLocalOnly = id.startsWith(LOCAL_ID_PREFIX);
-      if (isLocalOnly) {
+      if (isLocalOnly || !serverAuthed) {
         removeLocalBridge(id);
         window.toast?.("Removed from library");
         await this.loadSavedBridges();
@@ -557,32 +597,47 @@
       const countEl = $("libraryCount");
       const local = getLocalLibrary();
       if (!el) return;
-      if (!authUser && !local.length) {
+      if (!authUser) {
         panel?.classList.add("hidden");
         return;
       }
       panel?.classList.remove("hidden");
       el.innerHTML = `<div class="saved-bridges__loading"><span class="search-results__spinner"></span>Loading library…</div>`;
       let serverBridges = [];
-      if (authUser) {
+      let serverFailed = false;
+      if (serverAuthed) {
         try {
-          const data = await fetch("/api/bridges/saved", { credentials: "include" }).then(r => r.json());
+          const r = await fetch("/api/bridges/saved", { credentials: "include" });
+          if (r.status === 401) serverAuthed = false;
+          if (!r.ok) throw new Error("server_unavailable");
+          const data = await r.json();
           serverBridges = data.bridges || [];
-        } catch { /* fall back to local */ }
+        } catch {
+          serverFailed = true;
+          serverAuthed = false;
+        }
       }
-      const bridges = storageMode === "postgres"
-        ? serverBridges
-        : mergeLibraries(serverBridges, local);
+      const localForView = storageMode === "postgres" && serverAuthed && !serverFailed
+        ? local.filter(b => String(b.id || "").startsWith(LOCAL_ID_PREFIX))
+        : local;
+      const bridges = localForView.length || storageMode !== "postgres" || !serverAuthed || serverFailed
+        ? mergeLibraries(serverBridges, localForView)
+        : serverBridges;
       if (countEl) countEl.textContent = bridges.length ? String(bridges.length) : "";
+      renderStorageNote(storageMode);
+      this._renderSessionLostBanner({ session_lost: serverFailed && Boolean(authUser) && !serverAuthed });
       renderLibraryCards(el, bridges, this);
     },
 
     async openSavedBridge(id) {
       if (!id) return;
       const localBridge = getLocalLibrary().find(b => b.id === id);
-      if (authUser && !id.startsWith(LOCAL_ID_PREFIX)) {
+      if (serverAuthed && !id.startsWith(LOCAL_ID_PREFIX)) {
         try {
-          const bridge = await fetch(`/api/bridges/saved/${id}`, { credentials: "include" }).then(r => r.json());
+          const r = await fetch(`/api/bridges/saved/${id}`, { credentials: "include" });
+          if (r.status === 401) serverAuthed = false;
+          if (!r.ok) throw new Error("server_unavailable");
+          const bridge = await r.json();
           const session = {
             anchor_track: bridge.anchor_track,
             anchor_id: bridge.anchor_id,
