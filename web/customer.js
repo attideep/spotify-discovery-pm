@@ -13,6 +13,9 @@
 
   const LOCAL_LIB_KEY = "bridge_local_library_v1";
   const LOCAL_AUTH_KEY = "bridge_local_account_v1";
+  const ANON_LAST_SESSION_KEY = "bridge_anonymous_last_session_v1";
+  const LEGACY_LAST_SESSION_KEY = "bridge_last_session";
+  const LEGACY_LAST_EMAIL_KEY = "bridge_last_email";
   const LOCAL_ID_PREFIX = "local:";
 
   let authUser = null;
@@ -135,6 +138,29 @@
     } catch { /* ignore */ }
   }
 
+  function clearLegacyResumeState() {
+    try {
+      localStorage.removeItem(LEGACY_LAST_SESSION_KEY);
+      localStorage.removeItem(LEGACY_LAST_EMAIL_KEY);
+    } catch { /* ignore */ }
+  }
+
+  function clearStoredResumeState() {
+    try {
+      localStorage.removeItem(ANON_LAST_SESSION_KEY);
+    } catch { /* ignore */ }
+    clearLegacyResumeState();
+  }
+
+  function readAnonymousLastSession() {
+    try {
+      const raw = localStorage.getItem(ANON_LAST_SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    } catch {
+      return null;
+    }
+  }
+
   function mirrorBridgeLocal(session, serverId) {
     if (!session?.tracks?.length) return;
     const id = serverId ? String(serverId) : `${LOCAL_ID_PREFIX}${Date.now()}`;
@@ -236,10 +262,9 @@
         renderStorageNote(storageMode);
         if (authUser) {
           await this.loadSavedBridges();
-          try {
-            localStorage.setItem("bridge_last_email", authUser.email || "");
-          } catch { /* ignore */ }
+          clearStoredResumeState();
         } else {
+          clearLegacyResumeState();
           this._renderLibraryHint();
         }
         this._renderSessionLostBanner(data);
@@ -249,10 +274,15 @@
         const local = getLocalAuth();
         authUser = local?.active ? localUserFromAuth(local) : null;
         this._renderAuthUI({ logged_in: Boolean(authUser), user: authUser });
-        this._renderLibraryHint();
+        if (authUser) {
+          clearStoredResumeState();
+          await this.loadSavedBridges();
+        } else {
+          clearLegacyResumeState();
+          this._renderLibraryHint();
+        }
         this._renderSessionLostBanner({});
         this.renderContinueCard();
-        if (authUser) await this.loadSavedBridges();
       }
     },
 
@@ -340,13 +370,6 @@
       $("authSubmitBtn").dataset.mode = mode;
       $("authError")?.classList.add("hidden");
       $("authNameField")?.classList.toggle("hidden", mode !== "signup");
-      const emailEl = $("authEmail");
-      if (emailEl && !emailEl.value) {
-        try {
-          const last = localStorage.getItem("bridge_last_email");
-          if (last) emailEl.value = last;
-        } catch { /* ignore */ }
-      }
     },
 
     closeAuth() {
@@ -472,6 +495,11 @@
       setLocalAuthActive(false);
       authUser = null;
       sessionSaved = false;
+      clearStoredResumeState();
+      ["authEmail", "authPassword", "authName"].forEach(id => {
+        const input = $(id);
+        if (input) input.value = "";
+      });
       await this.refreshAuth();
       window.toast?.("Signed out");
     },
@@ -645,35 +673,33 @@
         el.classList.add("hidden");
         return;
       }
-      const raw = localStorage.getItem("bridge_last_session");
-      if (!raw) {
+      const session = readAnonymousLastSession();
+      if (!session?.tracks?.length) {
         el.classList.add("hidden");
         return;
       }
-      try {
-        const session = JSON.parse(raw);
-        if (!session.tracks?.length) {
-          el.classList.add("hidden");
-          return;
-        }
-        el.classList.remove("hidden");
-        const title = $("continueBridgeTitle");
-        if (title) title.textContent = session.anchor_track || "Your last bridge";
-      } catch {
-        el.classList.add("hidden");
-      }
+      el.classList.remove("hidden");
+      const title = $("continueBridgeTitle");
+      if (title) title.textContent = session.anchor_track || "Your last bridge";
     },
 
     dismissContinueCard() {
-      try {
-        localStorage.removeItem("bridge_last_session");
-      } catch { /* ignore */ }
+      clearStoredResumeState();
       $("continueBridge")?.classList.add("hidden");
     },
 
     persistLastSession(session) {
+      if (!session?.tracks?.length) {
+        clearStoredResumeState();
+        return;
+      }
       try {
-        localStorage.setItem("bridge_last_session", JSON.stringify({
+        clearLegacyResumeState();
+        if (authUser) {
+          localStorage.removeItem(ANON_LAST_SESSION_KEY);
+          return;
+        }
+        localStorage.setItem(ANON_LAST_SESSION_KEY, JSON.stringify({
           anchor_track: session.anchor_track,
           anchor_id: session.anchor_id,
           intent: session.intent,
@@ -693,13 +719,11 @@
       $("sessionLostSignIn")?.addEventListener("click", () => this.openAuth("login"));
       $("libraryNavBtn")?.addEventListener("click", () => this.scrollToLibrary());
       $("continueBridge")?.querySelector("[data-continue]")?.addEventListener("click", () => {
-        try {
-          const session = JSON.parse(localStorage.getItem("bridge_last_session") || "null");
-          if (session?.tracks?.length) {
-            window.displaySession?.(session);
-            window.toast?.("Resumed on this device");
-          }
-        } catch { /* ignore */ }
+        const session = readAnonymousLastSession();
+        if (session?.tracks?.length) {
+          window.displaySession?.(session);
+          window.toast?.("Resumed on this device");
+        }
       });
       $("continueBridge")?.querySelector("[data-dismiss-continue]")?.addEventListener("click", () => this.dismissContinueCard());
       $("authSubmitBtn")?.addEventListener("click", () => this.submitAuth());
