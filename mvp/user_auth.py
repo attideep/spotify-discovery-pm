@@ -155,6 +155,8 @@ def exchange_google_code(code: str) -> tuple[dict[str, Any] | None, str | None]:
 
     by_email = get_user_by_email(email)
     if by_email:
+        if by_email.get("password_hash"):
+            return None, "An account with this email already exists. Sign in with email and password."
         return {k: v for k, v in by_email.items() if k != "password_hash"}, None
 
     user = create_user(
