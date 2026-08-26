@@ -51,6 +51,12 @@
     } catch { /* ignore */ }
   }
 
+  function clearLocalAuth() {
+    try {
+      localStorage.removeItem(LOCAL_AUTH_KEY);
+    } catch { /* ignore */ }
+  }
+
   function setLocalAuthActive(active) {
     const acc = getLocalAuth();
     if (!acc) return;
@@ -401,8 +407,12 @@
         }
 
         if (r.ok && data.user) {
-          const pwHash = await hashCredentials(email, password);
-          saveLocalAuth(data.user, pwHash);
+          if (storageMode === "postgres") {
+            clearLocalAuth();
+          } else {
+            const pwHash = await hashCredentials(email, password);
+            saveLocalAuth(data.user, pwHash);
+          }
           await finishAuth(
             data.user,
             mode === "signup" ? "Welcome! Your library is ready." : "Signed in — your library is below."
