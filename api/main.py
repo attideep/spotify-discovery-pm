@@ -390,6 +390,11 @@ def api_list_saved(app_user: str | None = Cookie(default=None, alias=COOKIE_APP_
     return {"bridges": list_saved_bridges(user["id"])}
 
 
+def _bridge_payload_has_tracks(body: dict) -> bool:
+    tracks = body.get("tracks")
+    return isinstance(tracks, list) and len(tracks) > 0
+
+
 @app.post("/api/bridges/save")
 def api_save_bridge(
     body: dict,
@@ -398,6 +403,8 @@ def api_save_bridge(
     user = _current_app_user(app_user)
     if not user:
         raise HTTPException(401, "Sign in to save bridges.")
+    if not _bridge_payload_has_tracks(body):
+        raise HTTPException(400, "Cannot save a bridge without tracks.")
     saved = save_bridge(user["id"], body)
     if not saved:
         raise HTTPException(500, "Could not save bridge.")

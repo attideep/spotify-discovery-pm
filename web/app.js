@@ -187,11 +187,19 @@ async function tryLoadSharedBridge(shareParams) {
   }
 }
 
+function hasRenderableTracks(session) {
+  return Boolean(session && Array.isArray(session.tracks) && session.tracks.length);
+}
+
 function displaySession(session) {
+  if (!hasRenderableTracks(session)) {
+    showBridgeError("Could not display bridge — session is missing tracks.");
+    return false;
+  }
   lastSession = session;
   window.lastSession = session;
   const sessionBlock = document.getElementById("sessionBlock");
-  if (!sessionBlock) return;
+  if (!sessionBlock) return true;
   sessionBlock.classList.remove("hidden");
   sessionBlock.classList.remove("session-block");
   void sessionBlock.offsetWidth;
@@ -220,6 +228,7 @@ function displaySession(session) {
   window.BridgeExtras?.renderStats(session);
   window.BridgeExtras?.saveHistory(session);
   window.CustomerApp?.onSessionDisplay?.(session);
+  return true;
 }
 
 window.displaySession = displaySession;

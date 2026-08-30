@@ -120,6 +120,10 @@
     }
   }
 
+  function hasBridgeTracks(session) {
+    return Boolean(session && Array.isArray(session.tracks) && session.tracks.length);
+  }
+
   function getLocalLibrary() {
     try {
       const raw = localStorage.getItem(LOCAL_LIB_KEY);
@@ -477,7 +481,8 @@
     },
 
     async saveCurrentBridge() {
-      if (!window.lastSession) return window.toast?.("Generate a bridge first");
+      const session = window.lastSession;
+      if (!hasBridgeTracks(session)) return window.toast?.("Generate a bridge first");
       if (!authUser) return this.openAuth("login");
       if (sessionSaved) return window.toast?.("Already in your library");
       const saveBtn = $("saveBridgeBtn");
@@ -487,7 +492,7 @@
           method: "POST",
           credentials: "include",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(window.lastSession),
+          body: JSON.stringify(session),
         });
         const raw = await r.text();
         let data = {};
@@ -498,7 +503,7 @@
         }
         if (!r.ok) {
           if (storageMode !== "postgres" && authUser) {
-            mirrorBridgeLocal(window.lastSession);
+            mirrorBridgeLocal(session);
             this.markSessionSaved();
             window.toast?.("Saved on this device");
             await this.loadSavedBridges();
@@ -507,7 +512,7 @@
           }
           throw new Error(data.detail || data.error || "Save failed");
         }
-        mirrorBridgeLocal(window.lastSession, data.id);
+        mirrorBridgeLocal(session, data.id);
         this.markSessionSaved();
         window.toast?.("Saved to your library");
         await this.loadSavedBridges();
@@ -582,7 +587,14 @@
       const localBridge = getLocalLibrary().find(b => b.id === id);
       if (authUser && !id.startsWith(LOCAL_ID_PREFIX)) {
         try {
-          const bridge = await fetch(`/api/bridges/saved/${id}`, { credentials: "include" }).then(r => r.json());
+          const r = await fetch(`/api/bridges/saved/${id}`, { credentials: "include" });
+          const bridge = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            throw new Error(bridge.detail || bridge.error || "Could not open saved bridge");
+          }
+          if (!hasBridgeTracks(bridge)) {
+            throw new Error("Saved bridge is missing tracks");
+          }
           const session = {
             anchor_track: bridge.anchor_track,
             anchor_id: bridge.anchor_id,
@@ -591,7 +603,9 @@
             mode: "demo",
             tracks: bridge.tracks,
           };
-          window.displaySession?.(session);
+          if (window.displaySession?.(session) === false) {
+            throw new Error("Could not open saved bridge");
+          }
           this.markSessionSaved();
           window.toast?.("Bridge loaded from library");
           $("sessionBlock")?.scrollIntoView({ behavior: "smooth", block: "start" });
