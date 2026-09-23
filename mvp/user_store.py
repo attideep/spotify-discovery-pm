@@ -90,11 +90,12 @@ def ensure_user_schema() -> bool:
             with pg, pg.cursor() as cur:
                 cur.execute(
                     """
-                    SELECT 1 FROM information_schema.tables
-                    WHERE table_schema = 'public' AND table_name = 'app_users'
+                    SELECT table_name FROM information_schema.tables
+                    WHERE table_schema = 'public' AND table_name IN ('app_users', 'saved_bridges')
                     """
                 )
-                if cur.fetchone():
+                existing_tables = {row[0] for row in cur.fetchall()}
+                if {"app_users", "saved_bridges"}.issubset(existing_tables):
                     _user_schema_ready = True
                     return True
                 cur.execute(_USER_SCHEMA_PG)
