@@ -11,9 +11,13 @@ from discovery.config import get_settings
 from discovery.models import ReviewRecord
 
 
+def _serverless_runtime() -> bool:
+    return bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+
+
 def _reviews_db_path() -> Path:
     """Vercel serverless has a read-only project dir; only /tmp is writable."""
-    if os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"):
+    if _serverless_runtime():
         return Path("/tmp") / "spotify-discovery-reviews.db"
     settings = get_settings()
     return Path(settings.data_dir) / "reviews.db"
@@ -62,7 +66,7 @@ class ReviewStore:
 
     def embed(self, text: str) -> list[float]:
         settings = get_settings()
-        if settings.gemini_api_key_valid:
+        if settings.gemini_api_key_valid and not _serverless_runtime():
             try:
                 import google.generativeai as genai
 
@@ -76,6 +80,35 @@ class ReviewStore:
             except Exception:
                 pass
         return _hash_embedding(text)
+
+    def replace_all(self, records: list[ReviewRecord]) -> None:
+        rows = []
+        for record in records:
+            rows.append(
+                (
+                    record.id,
+                    record.source,
+                    record.platform,
+                    record.text,
+                    record.rating,
+                    record.url,
+                    json.dumps(record.themes),
+                    record.segment,
+                    record.sentiment,
+                    json.dumps(self.embed(record.text)),
+                )
+            )
+        with sqlite3.connect(self.db_path) as conn:
+            conn.execute("DELETE FROM reviews")
+            conn.executemany(
+                """
+                INSERT INTO reviews
+                (id, source, platform, text, rating, url, themes, segment, sentiment, embedding)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                rows,
+            )
+            conn.commit()
 
     def upsert(self, record: ReviewRecord) -> None:
         emb = self.embed(record.text)

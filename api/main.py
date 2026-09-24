@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import secrets
 import urllib.parse
 from pathlib import Path
@@ -105,15 +106,15 @@ class LoginBody(BaseModel):
 
 def _ensure_indexed() -> ReviewStore:
     store = ReviewStore()
-    if store.count() == 0:
-        settings = get_settings()
-        corpus_path = Path(settings.corpus_path)
-        if not corpus_path.exists():
-            build_seed_corpus(str(corpus_path))
-        records = load_corpus(corpus_path)
-        classified = classify_batch(records)
-        for r in classified:
-            store.upsert(r)
+    settings = get_settings()
+    corpus_path = Path(settings.corpus_path)
+    if not corpus_path.exists():
+        build_seed_corpus(str(corpus_path))
+    records = load_corpus(corpus_path)
+    if store.count() != len(records):
+        serverless = bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+        classified = classify_batch(records, force_keyword=serverless)
+        store.replace_all(classified)
     return store
 
 

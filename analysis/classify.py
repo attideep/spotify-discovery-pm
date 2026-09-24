@@ -58,9 +58,9 @@ def _sentiment(text: str, rating: float | None) -> float:
     return round(max(-1.0, min(1.0, base)), 2)
 
 
-def classify_record(record: ReviewRecord) -> ReviewRecord:
+def classify_record(record: ReviewRecord, *, force_keyword: bool = False) -> ReviewRecord:
     settings = get_settings()
-    if settings.mock_mode or not settings.anthropic_api_key:
+    if force_keyword or settings.mock_mode or not settings.anthropic_api_key:
         record.themes = _keyword_themes(record.text)
         record.segment = _keyword_segment(record.text)
         record.sentiment = _sentiment(record.text, record.rating)
@@ -94,5 +94,5 @@ Text: {record.text[:800]}"""
     return record
 
 
-def classify_batch(records: list[ReviewRecord]) -> list[ReviewRecord]:
-    return [classify_record(r) for r in records]
+def classify_batch(records: list[ReviewRecord], *, force_keyword: bool = False) -> list[ReviewRecord]:
+    return [classify_record(r, force_keyword=force_keyword) for r in records]
