@@ -81,5 +81,11 @@ def enforce_rate_limit(request: Request, *, scope: str = "api") -> None:
     if limit <= 0:
         return
     key = f"{scope}:{client_key(request)}"
-    if not _db_check(key, limit=limit, window_sec=60):
-        _memory_check(key, limit=limit, window_sec=60)
+    if settings.database_url.strip():
+        if not _db_check(key, limit=limit, window_sec=60):
+            raise HTTPException(
+                status_code=503,
+                detail="Rate limiting is temporarily unavailable. Please try again later.",
+            )
+        return
+    _memory_check(key, limit=limit, window_sec=60)
