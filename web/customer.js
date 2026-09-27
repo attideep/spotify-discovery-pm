@@ -81,13 +81,7 @@
     const norm = normalizeEmail(email);
     const existing = getLocalAuth();
     if (existing && normalizeEmail(existing.email) === norm) {
-      const pwHash = await hashCredentials(email, password);
-      saveLocalAuth({
-        id: existing.id,
-        email: norm,
-        display_name: display_name.trim() || existing.display_name || norm.split("@")[0],
-      }, pwHash);
-      return localUserFromAuth(getLocalAuth());
+      throw new Error("Account exists on this device — sign in with the existing password.");
     }
     const pwHash = await hashCredentials(email, password);
     const user = {
@@ -374,6 +368,7 @@
         return;
       }
 
+      let allowLocalSignupFallback = false;
       const finishAuth = async (user, message) => {
         authUser = { ...user, _localAuth: storageMode !== "postgres" };
         setLocalAuthActive(true);
@@ -397,7 +392,12 @@
         try {
           data = raw ? JSON.parse(raw) : {};
         } catch {
-          throw new Error("Unexpected server response. Trying this device…");
+          allowLocalSignupFallback = mode === "signup" && r.status >= 500;
+          throw new Error(
+            allowLocalSignupFallback
+              ? "Account server unavailable. Trying this device…"
+              : "Unexpected server response."
+          );
         }
 
         if (r.ok && data.user) {
@@ -430,6 +430,10 @@
 
         if (storageMode !== "postgres") {
           if (mode === "signup") {
+            if (r.status < 500) {
+              throw new Error(serverErr || "Could not create account. Please try again.");
+            }
+            allowLocalSignupFallback = true;
             const user = await createLocalAccount(email, password, display_name);
             await finishAuth(user, "Account created on this device. Your library stays in this browser.");
             return;
@@ -453,15 +457,27 @@
           await finishAuth(localUserFromAuth(local), "Signed in on this device.");
           return;
         }
-        if (storageMode !== "postgres" && mode === "signup") {
+        let authError = e;
+        if (
+          storageMode !== "postgres" &&
+          mode === "signup" &&
+          (allowLocalSignupFallback || e instanceof TypeError)
+        ) {
+          if (await verifyLocalPassword(email, password)) {
+            const local = getLocalAuth();
+            await finishAuth(localUserFromAuth(local), "Welcome back — signed in on this device.");
+            return;
+          }
           try {
             const user = await createLocalAccount(email, password, display_name);
             await finishAuth(user, "Account saved on this device.");
             return;
-          } catch { /* fall through */ }
+          } catch (localErr) {
+            authError = localErr;
+          }
         }
         if (errEl) {
-          errEl.textContent = e.message;
+          errEl.textContent = authError.message;
           errEl.classList.remove("hidden");
         }
       }
