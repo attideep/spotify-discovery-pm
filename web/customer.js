@@ -17,7 +17,12 @@
 
   let authUser = null;
   let sessionSaved = false;
-  let storageMode = "sqlite-ephemeral";
+  let storageMode = null;
+  let authStatusReady = false;
+
+  function localFallbackAllowed() {
+    return Boolean(storageMode && storageMode !== "postgres");
+  }
 
   function normalizeEmail(email) {
     return String(email || "").trim().toLowerCase();
@@ -223,17 +228,24 @@
       try {
         const data = await fetch("/api/auth/user/status", { credentials: "include" }).then(r => r.json());
         storageMode = data.storage || storageMode;
+        authStatusReady = Boolean(storageMode);
         if (data.session_lost) {
-          window.toast?.("Server session expired — using your account on this device.");
+          window.toast?.(
+            localFallbackAllowed()
+              ? "Server session expired — using your account on this device."
+              : "Server session expired — please sign in again."
+          );
         }
         if (data.logged_in && data.user) {
           authUser = data.user;
-        } else {
+        } else if (localFallbackAllowed()) {
           const local = getLocalAuth();
           authUser = local?.active ? localUserFromAuth(local) : null;
+        } else {
+          authUser = null;
         }
         this._renderAuthUI({ logged_in: Boolean(authUser), user: authUser });
-        renderStorageNote(storageMode);
+        if (storageMode) renderStorageNote(storageMode);
         if (authUser) {
           await this.loadSavedBridges();
           try {
@@ -246,8 +258,12 @@
         this.renderContinueCard();
         return data;
       } catch {
-        const local = getLocalAuth();
-        authUser = local?.active ? localUserFromAuth(local) : null;
+        if (localFallbackAllowed()) {
+          const local = getLocalAuth();
+          authUser = local?.active ? localUserFromAuth(local) : null;
+        } else {
+          authUser = null;
+        }
         this._renderAuthUI({ logged_in: Boolean(authUser), user: authUser });
         this._renderLibraryHint();
         this._renderSessionLostBanner({});
@@ -373,9 +389,12 @@
         }
         return;
       }
+      if (!authStatusReady) {
+        await this.refreshAuth();
+      }
 
       const finishAuth = async (user, message) => {
-        authUser = { ...user, _localAuth: storageMode !== "postgres" };
+        authUser = { ...user, _localAuth: Boolean(user?._localAuth) };
         setLocalAuthActive(true);
         this.closeAuth();
         $("authPassword").value = "";
@@ -399,6 +418,10 @@
         } catch {
           throw new Error("Unexpected server response. Trying this device…");
         }
+        if (data.storage) {
+          storageMode = data.storage;
+          authStatusReady = true;
+        }
 
         if (r.ok && data.user) {
           const pwHash = await hashCredentials(email, password);
@@ -411,7 +434,7 @@
         }
 
         const serverErr = data.detail || data.error || "";
-        if (mode === "login" && (r.status === 401 || r.status === 400)) {
+        if (localFallbackAllowed() && mode === "login" && (r.status === 401 || r.status === 400)) {
           if (await verifyLocalPassword(email, password)) {
             const local = getLocalAuth();
             await finishAuth(localUserFromAuth(local), "Signed in on this device.");
@@ -419,7 +442,7 @@
           }
         }
 
-        if (mode === "signup" && serverErr.includes("already exists")) {
+        if (localFallbackAllowed() && mode === "signup" && serverErr.includes("already exists")) {
           if (await verifyLocalPassword(email, password)) {
             const local = getLocalAuth();
             await finishAuth(localUserFromAuth(local), "Welcome back — signed in on this device.");
@@ -428,7 +451,7 @@
           throw new Error("Account exists on this device — try signing in with the same password.");
         }
 
-        if (storageMode !== "postgres") {
+        if (localFallbackAllowed()) {
           if (mode === "signup") {
             const user = await createLocalAccount(email, password, display_name);
             await finishAuth(user, "Account created on this device. Your library stays in this browser.");
@@ -448,12 +471,12 @@
             : "Could not create account. Please try again.")
         );
       } catch (e) {
-        if (storageMode !== "postgres" && mode === "login" && await verifyLocalPassword(email, password)) {
+        if (localFallbackAllowed() && mode === "login" && await verifyLocalPassword(email, password)) {
           const local = getLocalAuth();
           await finishAuth(localUserFromAuth(local), "Signed in on this device.");
           return;
         }
-        if (storageMode !== "postgres" && mode === "signup") {
+        if (localFallbackAllowed() && mode === "signup") {
           try {
             const user = await createLocalAccount(email, password, display_name);
             await finishAuth(user, "Account saved on this device.");
@@ -497,7 +520,7 @@
           throw new Error("Could not save bridge — try again.");
         }
         if (!r.ok) {
-          if (storageMode !== "postgres" && authUser) {
+          if (localFallbackAllowed() && authUser) {
             mirrorBridgeLocal(window.lastSession);
             this.markSessionSaved();
             window.toast?.("Saved on this device");
