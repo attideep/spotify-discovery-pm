@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     corpus_path: str = "data/corpus.json"
     allow_demo_mode: bool = True
     rate_limit_per_minute: int = 30
+    ingest_admin_token: str = ""
     # Set true only when OpenAI billing is active — avoids 10s timeouts on quota errors
     openai_bridge_planner_enabled: bool = False
 

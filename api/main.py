@@ -177,8 +177,9 @@ def api_metrics() -> dict:
 
 
 @app.post("/api/ingest")
-def api_ingest() -> dict:
+def api_ingest(request: Request) -> dict:
     settings = get_settings()
+    _authorize_ingest(request, settings)
     if settings.mock_mode:
         path = build_seed_corpus(settings.corpus_path)
     else:
@@ -190,6 +191,22 @@ def api_ingest() -> dict:
     for r in classify_batch(records):
         store.upsert(r)
     return {"indexed": store.count(), "corpus": path}
+
+
+def _authorize_ingest(request: Request, settings=None) -> None:
+    settings = settings or get_settings()
+    configured_token = settings.ingest_admin_token.strip()
+    if settings.mock_mode and not configured_token:
+        return
+    if not configured_token:
+        raise HTTPException(403, "Live ingest is disabled until INGEST_ADMIN_TOKEN is configured.")
+
+    supplied = request.headers.get("x-ingest-admin-token", "").strip()
+    auth_header = request.headers.get("authorization", "")
+    if auth_header.lower().startswith("bearer "):
+        supplied = auth_header[7:].strip()
+    if not supplied or not secrets.compare_digest(supplied, configured_token):
+        raise HTTPException(403, "Invalid ingest admin token.")
 
 
 @app.get("/api/insights")

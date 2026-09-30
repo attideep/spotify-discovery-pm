@@ -37,6 +37,7 @@ Set in Vercel → Project → Settings → Environment Variables:
 | `ANTHROPIC_API_KEY` | Optional | Richer Ask Corpus answers (RAG) |
 | `ALLOW_DEMO_MODE` | Optional | `true` (default) — public demo without login |
 | `MOCK_MODE` | Optional | `false` in production; `true` skips live review ingest |
+| `INGEST_ADMIN_TOKEN` | Optional | Required to call `POST /api/ingest` when `MOCK_MODE=false` |
 
 No env vars are required for the public demo — chart catalog search and demo bridges work out of the box.
 
@@ -115,6 +116,7 @@ Source CSV (`data/.spotify_tracks_dataset.csv`) is gitignored; download separate
 |---------|---------|-------|
 | Bridge analytics | `DATABASE_URL` | Supabase Postgres — auto-creates `bridge_events` table on startup |
 | Rate limiting | `RATE_LIMIT_PER_MINUTE` | Default 30/min per IP on `/api/bridge` and `/api/ask` |
+| Live ingest admin | `INGEST_ADMIN_TOKEN` | Protects scraper + classification rebuilds behind `X-Ingest-Admin-Token` or `Authorization: Bearer` |
 | Metrics | — | `GET /api/metrics` — bridge counts when DB connected |
 | Custom domain | Vercel settings | Project → Domains |
 

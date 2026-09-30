@@ -88,6 +88,7 @@ See [`docs/PRODUCTION.md`](docs/PRODUCTION.md) for Vercel setup, environment var
 | `ANTHROPIC_API_KEY` | Optional — richer Ask Corpus answers (RAG) |
 | `DATABASE_URL` | Optional Supabase — bridge analytics + distributed rate limits |
 | `RATE_LIMIT_PER_MINUTE` | Abuse protection (default 30) |
+| `INGEST_ADMIN_TOKEN` | Optional admin token required to run live `/api/ingest` |
 | `SPOTIFY_CLIENT_ID/SECRET` | Optional — full catalog search + save to playlist |
 | `SESSION_SECRET` | Signed session cookies for OAuth |
 
