@@ -217,7 +217,8 @@ def api_ask(body: AskBody, request: Request) -> dict:
 
 
 @app.get("/api/ask/{question_key}")
-def api_ask_canonical(question_key: str) -> dict:
+def api_ask_canonical(question_key: str, request: Request) -> dict:
+    enforce_rate_limit(request, scope="ask")
     if question_key not in CANONICAL_QUESTIONS:
         raise HTTPException(404, "Unknown question key")
     store = _ensure_indexed()
@@ -549,7 +550,8 @@ def api_bridge(
 
 
 @app.post("/api/bridge/restore")
-def api_bridge_restore(body: RestoreBridgeBody) -> JSONResponse:
+def api_bridge_restore(body: RestoreBridgeBody, request: Request) -> JSONResponse:
+    enforce_rate_limit(request, scope="bridge")
     tid = resolve_track_query(body.anchor) if body.anchor else None
     try:
         session = restore_bridge_session(
