@@ -428,7 +428,8 @@ def api_delete_saved(bridge_id: str, app_user: str | None = Cookie(default=None,
 # --- Bridge ---
 
 @app.get("/api/track/{track_ref:path}")
-def api_track_lookup(track_ref: str) -> dict:
+def api_track_lookup(track_ref: str, request: Request) -> dict:
+    enforce_rate_limit(request, scope="catalog")
     tid = parse_track_id(track_ref)
     if not tid:
         raise HTTPException(400, "Invalid Spotify track URL or ID")
@@ -441,8 +442,10 @@ def api_track_lookup(track_ref: str) -> dict:
 @app.post("/api/track/lookup")
 def api_track_lookup_post(
     body: dict,
+    request: Request,
     bridge_session: str | None = Cookie(default=None, alias=COOKIE_SESSION),
 ) -> dict:
+    enforce_rate_limit(request, scope="catalog")
     raw = body.get("anchor", "").strip()
     tid = resolve_track_query(raw)
     if not tid:
@@ -460,11 +463,13 @@ def api_track_lookup_post(
 
 @app.get("/api/preview")
 def api_preview(
+    request: Request,
     name: str = "",
     artist: str = "",
     track_id: str = "",
 ) -> dict:
     """~30s audio preview URL for in-browser playback (iTunes Search)."""
+    enforce_rate_limit(request, scope="catalog")
     track_name = name.strip()
     track_artist = artist.strip()
     if track_id and not track_name:
@@ -481,7 +486,8 @@ def api_preview(
 
 
 @app.get("/api/search/tracks")
-def api_search_tracks(q: str) -> dict:
+def api_search_tracks(q: str, request: Request) -> dict:
+    enforce_rate_limit(request, scope="catalog")
     query = q.strip()
     if not query:
         raise HTTPException(400, "Enter a song or artist to search")
