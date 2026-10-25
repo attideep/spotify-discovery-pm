@@ -323,6 +323,16 @@ let insightsCache = null;
 let activeTheme = null;
 let activeSegment = null;
 
+function clearBridgePreviewSurface() {
+  if (!BRIDGE_ENHANCED) return;
+  window.BridgePlayer?.stop?.();
+  document.querySelector(".app")?.classList.remove("app--has-player");
+  document.getElementById("previewBar")?.classList.add("hidden");
+  const panel = document.getElementById("bridgeArtPanel");
+  panel?.classList.add("hidden");
+  panel?.setAttribute("aria-hidden", "true");
+}
+
 function switchTab(tab, { preserveQuery = false } = {}) {
   if (BRIDGE_ONLY) {
     if (tab !== "bridge") return;
@@ -341,16 +351,13 @@ function switchTab(tab, { preserveQuery = false } = {}) {
   if (panel) panel.classList.add("active");
   document.getElementById("mainArea").dataset.accent = TAB_ACCENTS[tab] || "home";
 
-  if (tab === "home") {
-    history.replaceState(null, "", "/");
-    if (BRIDGE_ENHANCED) {
-      document.getElementById("bridgeArtPanel")?.classList.add("hidden");
-    }
-    return;
+  if (tab !== "bridge") {
+    clearBridgePreviewSurface();
   }
 
-  if (BRIDGE_ENHANCED && tab !== "bridge") {
-    document.getElementById("bridgeArtPanel")?.classList.add("hidden");
+  if (tab === "home") {
+    history.replaceState(null, "", "/");
+    return;
   }
 
   const query = preserveQuery && location.hash.includes("?")
