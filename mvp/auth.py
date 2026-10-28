@@ -91,7 +91,10 @@ def refreshed_session_cookie(session_cookie: str | None) -> str | None:
         return None
     client = SpotifyClient(data["access_token"], data.get("refresh_token", ""))
     if data.get("expires_at", 0) < time.time() + 60:
-        refreshed = client.refresh()
+        try:
+            refreshed = client.refresh()
+        except SpotifyAPIError:
+            return None
         data["access_token"] = refreshed["access_token"]
         data["refresh_token"] = refreshed.get("refresh_token", data.get("refresh_token", ""))
         data["expires_at"] = refreshed.get("expires_at", time.time() + 3600)
