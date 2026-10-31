@@ -8,7 +8,7 @@ from fastapi import Cookie, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from analysis.classify import classify_batch
 from analysis.cluster import compute_insights
@@ -50,8 +50,17 @@ from mvp.user_auth import (
     register_user,
     user_from_id,
 )
-from mvp.user_store import delete_saved_bridge, ensure_user_schema, get_saved_bridge, list_saved_bridges, save_bridge
+from mvp.user_store import (
+    MAX_SAVED_BRIDGE_TRACKS,
+    delete_saved_bridge,
+    ensure_user_schema,
+    get_saved_bridge,
+    list_saved_bridges,
+    save_bridge,
+)
 from mvp.spotify_client import SpotifyAPIError, SpotifyClient, normalize_track
+
+MAX_SAVED_BRIDGE_REQUEST_BYTES = 32 * 1024
 
 app = FastAPI(
     title="Spotify Discovery Engine",
@@ -92,6 +101,29 @@ class RestoreBridgeBody(BaseModel):
     track_ids: list[str]
 
 
+class SavedBridgeTrackBody(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    position: int = 0
+    track_id: str = Field(..., min_length=1, max_length=128)
+    name: str = Field(default="", max_length=200)
+    artist: str = Field(default="", max_length=200)
+    spotify_url: str = Field(default="", max_length=500)
+    album_art: str = Field(default="", max_length=1000)
+    explanation: str = Field(default="", max_length=500)
+    novelty_score: float = 0.0
+
+
+class SavedBridgeBody(BaseModel):
+    model_config = ConfigDict(extra="ignore", str_strip_whitespace=True)
+
+    anchor_track: str = Field(default="", max_length=200)
+    anchor_id: str = Field(default="", max_length=128)
+    intent: str = Field(default="", max_length=500)
+    session_summary: str = Field(default="", max_length=1000)
+    tracks: list[SavedBridgeTrackBody] = Field(min_length=1, max_length=MAX_SAVED_BRIDGE_TRACKS)
+
+
 class SignupBody(BaseModel):
     email: str
     password: str
@@ -129,6 +161,27 @@ def _spotify_error(exc: SpotifyAPIError) -> JSONResponse:
         status_code=exc.status or 502,
         content={"error": str(exc), "code": exc.code},
     )
+
+
+async def _read_bounded_body(request: Request, *, limit: int) -> bytes:
+    content_length = request.headers.get("content-length")
+    if content_length:
+        try:
+            if int(content_length) > limit:
+                raise HTTPException(413, "Saved bridge payload is too large.")
+        except ValueError:
+            pass
+
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in request.stream():
+        total += len(chunk)
+        if total > limit:
+            raise HTTPException(413, "Saved bridge payload is too large.")
+        chunks.append(chunk)
+    if not chunks:
+        raise HTTPException(400, "Request body required.")
+    return b"".join(chunks)
 
 
 @app.on_event("startup")
@@ -391,14 +444,22 @@ def api_list_saved(app_user: str | None = Cookie(default=None, alias=COOKIE_APP_
 
 
 @app.post("/api/bridges/save")
-def api_save_bridge(
-    body: dict,
+async def api_save_bridge(
+    request: Request,
     app_user: str | None = Cookie(default=None, alias=COOKIE_APP_USER),
 ) -> dict:
+    enforce_rate_limit(request, scope="save_bridge")
     user = _current_app_user(app_user)
     if not user:
         raise HTTPException(401, "Sign in to save bridges.")
-    saved = save_bridge(user["id"], body)
+
+    raw_body = await _read_bounded_body(request, limit=MAX_SAVED_BRIDGE_REQUEST_BYTES)
+    try:
+        body = SavedBridgeBody.model_validate_json(raw_body)
+    except ValidationError as exc:
+        raise HTTPException(422, exc.errors()) from exc
+
+    saved = save_bridge(user["id"], body.model_dump())
     if not saved:
         raise HTTPException(500, "Could not save bridge.")
     return saved

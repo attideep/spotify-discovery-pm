@@ -37,6 +37,10 @@ CREATE TABLE IF NOT EXISTS saved_bridges (
 CREATE INDEX IF NOT EXISTS idx_saved_bridges_user ON saved_bridges(user_id, created_at DESC);
 """
 
+MAX_SAVED_BRIDGES_PER_USER = 40
+MAX_SAVED_BRIDGE_TRACKS = 8
+MAX_SAVED_BRIDGE_TRACKS_JSON_BYTES = 24 * 1024
+
 _user_schema_ready = False
 
 
@@ -274,14 +278,62 @@ def get_user_by_google_id(google_id: str) -> dict[str, Any] | None:
     return dict(r) if r else None
 
 
+def _saved_text(value: Any, limit: int) -> str:
+    return str(value or "")[:limit]
+
+
+def _saved_int(value: Any, default: int) -> int:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _saved_float(value: Any) -> float:
+    try:
+        return float(value or 0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _normalize_saved_tracks(tracks: Any) -> list[dict[str, Any]]:
+    if not isinstance(tracks, list):
+        return []
+
+    normalized: list[dict[str, Any]] = []
+    for i, track in enumerate(tracks[:MAX_SAVED_BRIDGE_TRACKS], start=1):
+        if not isinstance(track, dict):
+            continue
+        track_id = _saved_text(track.get("track_id"), 128)
+        if not track_id:
+            continue
+        normalized.append(
+            {
+                "position": _saved_int(track.get("position"), i),
+                "track_id": track_id,
+                "name": _saved_text(track.get("name"), 200),
+                "artist": _saved_text(track.get("artist"), 200),
+                "spotify_url": _saved_text(track.get("spotify_url"), 500),
+                "album_art": _saved_text(track.get("album_art"), 1000),
+                "explanation": _saved_text(track.get("explanation"), 500),
+                "novelty_score": _saved_float(track.get("novelty_score")),
+            }
+        )
+    return normalized
+
+
 def save_bridge(user_id: str, session: dict[str, Any]) -> dict[str, Any] | None:
     if not ensure_user_schema():
         return None
     bid = str(uuid.uuid4())
-    tracks = session.get("tracks") or []
-    title = f"Bridge from {session.get('anchor_track', 'your anchor')}"[:120]
-    payload = json.dumps(tracks)
-    anchor_id = session.get("anchor_id") or ""
+    tracks = _normalize_saved_tracks(session.get("tracks"))
+    if not tracks:
+        return None
+    title = f"Bridge from {_saved_text(session.get('anchor_track') or 'your anchor', 200)}"[:120]
+    payload = json.dumps(tracks, separators=(",", ":"))
+    if len(payload.encode("utf-8")) > MAX_SAVED_BRIDGE_TRACKS_JSON_BYTES:
+        return None
+    anchor_id = _saved_text(session.get("anchor_id"), 128)
 
     pg = _pg_conn()
     if pg:
@@ -297,14 +349,27 @@ def save_bridge(user_id: str, session: dict[str, Any]) -> dict[str, Any] | None:
                         bid,
                         user_id,
                         title,
-                        session.get("intent", "")[:500],
-                        session.get("anchor_track", "")[:200],
+                        _saved_text(session.get("intent"), 500),
+                        _saved_text(session.get("anchor_track"), 200),
                         anchor_id,
-                        session.get("session_summary", "")[:1000],
+                        _saved_text(session.get("session_summary"), 1000),
                         payload,
                     ),
                 )
                 r = cur.fetchone()
+                cur.execute(
+                    """
+                    DELETE FROM saved_bridges
+                    WHERE user_id = %s
+                      AND id NOT IN (
+                        SELECT id FROM saved_bridges
+                        WHERE user_id = %s
+                        ORDER BY created_at DESC, id DESC
+                        LIMIT %s
+                      )
+                    """,
+                    (user_id, user_id, MAX_SAVED_BRIDGES_PER_USER),
+                )
             return {"id": r[0], "title": r[1], "intent": r[2], "anchor_track": r[3], "anchor_id": r[4], "session_summary": r[5], "created_at": str(r[6])}
         except Exception:
             return None
@@ -313,6 +378,7 @@ def save_bridge(user_id: str, session: dict[str, Any]) -> dict[str, Any] | None:
 
     try:
         conn = _sqlite_conn()
+        created_at = _now_iso()
         with conn:
             conn.execute(
                 """
@@ -323,16 +389,37 @@ def save_bridge(user_id: str, session: dict[str, Any]) -> dict[str, Any] | None:
                     bid,
                     user_id,
                     title,
-                    session.get("intent", "")[:500],
-                    session.get("anchor_track", "")[:200],
+                    _saved_text(session.get("intent"), 500),
+                    _saved_text(session.get("anchor_track"), 200),
                     anchor_id,
-                    session.get("session_summary", "")[:1000],
+                    _saved_text(session.get("session_summary"), 1000),
                     payload,
-                    _now_iso(),
+                    created_at,
                 ),
             )
+            conn.execute(
+                """
+                DELETE FROM saved_bridges
+                WHERE user_id = ?
+                  AND id NOT IN (
+                    SELECT id FROM saved_bridges
+                    WHERE user_id = ?
+                    ORDER BY created_at DESC, id DESC
+                    LIMIT ?
+                  )
+                """,
+                (user_id, user_id, MAX_SAVED_BRIDGES_PER_USER),
+            )
         conn.close()
-        return {"id": bid, "title": title, "intent": session.get("intent", ""), "anchor_track": session.get("anchor_track", ""), "anchor_id": anchor_id, "session_summary": session.get("session_summary", ""), "created_at": _now_iso()}
+        return {
+            "id": bid,
+            "title": title,
+            "intent": _saved_text(session.get("intent"), 500),
+            "anchor_track": _saved_text(session.get("anchor_track"), 200),
+            "anchor_id": anchor_id,
+            "session_summary": _saved_text(session.get("session_summary"), 1000),
+            "created_at": created_at,
+        }
     except Exception:
         return None
 
