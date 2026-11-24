@@ -1,6 +1,10 @@
+import os
 from functools import lru_cache
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+DEFAULT_SESSION_SECRET = "change-me-in-production"
+MIN_SESSION_SECRET_LENGTH = 32
 
 
 class Settings(BaseSettings):
@@ -15,7 +19,7 @@ class Settings(BaseSettings):
     spotify_client_id: str = ""
     spotify_client_secret: str = ""
     spotify_redirect_uri: str = "https://spotify-discovery-pm.vercel.app/mvp/callback"
-    session_secret: str = "change-me-in-production"
+    session_secret: str = DEFAULT_SESSION_SECRET
     google_client_id: str = ""
     google_client_secret: str = ""
     api_base_url: str = "https://spotify-discovery-pm.vercel.app"
@@ -57,6 +61,19 @@ class Settings(BaseSettings):
     @property
     def persistence_enabled(self) -> bool:
         return bool(self.database_url.strip())
+
+    @property
+    def deployed_environment(self) -> bool:
+        return bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+
+    def validate_session_secret(self) -> None:
+        if not self.deployed_environment:
+            return
+        secret = self.session_secret.strip()
+        if secret == DEFAULT_SESSION_SECRET or len(secret) < MIN_SESSION_SECRET_LENGTH:
+            raise RuntimeError(
+                "SESSION_SECRET must be set to a strong random value in deployed environments."
+            )
 
 
 @lru_cache

@@ -133,6 +133,7 @@ def _spotify_error(exc: SpotifyAPIError) -> JSONResponse:
 
 @app.on_event("startup")
 def startup() -> None:
+    get_settings().validate_session_secret()
     _ensure_indexed()
     ensure_schema()
     ensure_user_schema()
