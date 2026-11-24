@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict
+from ipaddress import ip_address
 from threading import Lock
 
 from fastapi import HTTPException, Request
@@ -16,7 +17,15 @@ _memory_buckets: dict[str, list[float]] = defaultdict(list)
 def client_key(request: Request) -> str:
     forwarded = request.headers.get("x-forwarded-for")
     if forwarded:
-        return forwarded.split(",")[0].strip()
+        for part in reversed(forwarded.split(",")):
+            candidate = part.strip()
+            if not candidate:
+                continue
+            try:
+                ip_address(candidate)
+            except ValueError:
+                continue
+            return candidate
     if request.client:
         return request.client.host
     return "unknown"

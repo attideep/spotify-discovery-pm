@@ -16,15 +16,21 @@ OAUTH_MAX_AGE = 600  # 10 min
 
 
 def _ser() -> URLSafeTimedSerializer:
-    return URLSafeTimedSerializer(get_settings().session_secret, salt="bridge-v1")
+    settings = get_settings()
+    settings.validate_session_secret()
+    return URLSafeTimedSerializer(settings.session_secret, salt="bridge-v1")
 
 
 def _oauth_ser() -> URLSafeTimedSerializer:
-    return URLSafeTimedSerializer(get_settings().session_secret, salt="oauth-v1")
+    settings = get_settings()
+    settings.validate_session_secret()
+    return URLSafeTimedSerializer(settings.session_secret, salt="oauth-v1")
 
 
 def _app_user_ser() -> URLSafeTimedSerializer:
-    return URLSafeTimedSerializer(get_settings().session_secret, salt="app-user-v1")
+    settings = get_settings()
+    settings.validate_session_secret()
+    return URLSafeTimedSerializer(settings.session_secret, salt="app-user-v1")
 
 
 def pack_app_user(user_id: str, email: str, display_name: str = "") -> str:
