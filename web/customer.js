@@ -582,7 +582,14 @@
       const localBridge = getLocalLibrary().find(b => b.id === id);
       if (authUser && !id.startsWith(LOCAL_ID_PREFIX)) {
         try {
-          const bridge = await fetch(`/api/bridges/saved/${id}`, { credentials: "include" }).then(r => r.json());
+          const r = await fetch(`/api/bridges/saved/${encodeURIComponent(id)}`, { credentials: "include" });
+          const bridge = await r.json().catch(() => ({}));
+          if (!r.ok) {
+            throw new Error(bridge.detail || bridge.error || "Could not open saved bridge");
+          }
+          if (!Array.isArray(bridge.tracks) || !bridge.tracks.length) {
+            throw new Error("Saved bridge is missing tracks");
+          }
           const session = {
             anchor_track: bridge.anchor_track,
             anchor_id: bridge.anchor_id,
