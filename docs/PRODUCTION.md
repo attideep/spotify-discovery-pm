@@ -36,9 +36,10 @@ Set in Vercel → Project → Settings → Environment Variables:
 | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Optional | Review embeddings only |
 | `ANTHROPIC_API_KEY` | Optional | Richer Ask Corpus answers (RAG) |
 | `ALLOW_DEMO_MODE` | Optional | `true` (default) — public demo without login |
+| `DATABASE_URL` | Account sync | Supabase Postgres for server-side user accounts, saved bridges, analytics, and distributed rate limits |
 | `MOCK_MODE` | Optional | `false` in production; `true` skips live review ingest |
 
-No env vars are required for the public demo — chart catalog search and demo bridges work out of the box.
+No env vars are required for the public demo — chart catalog search and demo bridges work out of the box. On Vercel, server-side customer accounts and saved-bridge sync require `DATABASE_URL`; without it, the app falls back to this-browser-only saves instead of writing accounts to ephemeral serverless storage.
 
 ---
 
@@ -113,7 +114,7 @@ Source CSV (`data/.spotify_tracks_dataset.csv`) is gitignored; download separate
 
 | Feature | Env var | Notes |
 |---------|---------|-------|
-| Bridge analytics | `DATABASE_URL` | Supabase Postgres — auto-creates `bridge_events` table on startup |
+| Bridge analytics + account sync | `DATABASE_URL` | Supabase Postgres — auto-creates bridge event, user, and saved-bridge tables on startup |
 | Rate limiting | `RATE_LIMIT_PER_MINUTE` | Default 30/min per IP on `/api/bridge` and `/api/ask` |
 | Metrics | — | `GET /api/metrics` — bridge counts when DB connected |
 | Custom domain | Vercel settings | Project → Domains |

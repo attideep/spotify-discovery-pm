@@ -40,9 +40,17 @@ CREATE INDEX IF NOT EXISTS idx_saved_bridges_user ON saved_bridges(user_id, crea
 _user_schema_ready = False
 
 
+def _is_vercel_runtime() -> bool:
+    return bool(os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+
+
+def _serverless_requires_database() -> bool:
+    return _is_vercel_runtime() and not get_settings().database_url.strip()
+
+
 def _sqlite_path() -> Path:
     """Vercel serverless has a read-only project dir; only /tmp is writable."""
-    if os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"):
+    if _is_vercel_runtime():
         return Path("/tmp") / "spotify-discovery-users.db"
     return Path(__file__).resolve().parent.parent / "data" / "users.db"
 
@@ -74,13 +82,15 @@ def _sqlite_conn() -> sqlite3.Connection:
 def storage_mode() -> str:
     if get_settings().database_url.strip():
         return "postgres"
-    if os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"):
-        return "sqlite-ephemeral"
+    if _is_vercel_runtime():
+        return "unavailable"
     return "sqlite"
 
 
 def ensure_user_schema() -> bool:
     global _user_schema_ready
+    if _serverless_requires_database():
+        return False
     if _user_schema_ready:
         return True
 

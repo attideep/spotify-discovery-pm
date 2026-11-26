@@ -86,7 +86,7 @@ See [`docs/PRODUCTION.md`](docs/PRODUCTION.md) for Vercel setup, environment var
 | `OPENAI_API_KEY` | OpenAI bridge planner (shows **AI planned** badge); Smart match fallback without |
 | `GEMINI_API_KEY` or `GOOGLE_API_KEY` | Optional review embeddings only |
 | `ANTHROPIC_API_KEY` | Optional — richer Ask Corpus answers (RAG) |
-| `DATABASE_URL` | Optional Supabase — bridge analytics + distributed rate limits |
+| `DATABASE_URL` | Optional Supabase — bridge analytics + distributed rate limits; required for server-side account/saved-bridge sync on Vercel |
 | `RATE_LIMIT_PER_MINUTE` | Abuse protection (default 30) |
 | `SPOTIFY_CLIENT_ID/SECRET` | Optional — full catalog search + save to playlist |
 | `SESSION_SECRET` | Signed session cookies for OAuth |
