@@ -367,6 +367,24 @@ function escapeHtml(text) {
     .replace(/"/g, "&quot;");
 }
 
+function getSpotifyTrackUrl(track) {
+  const raw = String(track?.spotify_url || "").trim();
+  try {
+    const url = new URL(raw);
+    if (
+      url.protocol === "https:"
+      && url.hostname === "open.spotify.com"
+      && /^\/track\/[A-Za-z0-9]{22}$/.test(url.pathname)
+    ) {
+      return url.toString();
+    }
+  } catch {
+    /* Fall back to the canonical URL from the track id below. */
+  }
+  const id = parseTrackId(track?.track_id || "");
+  return id ? `https://open.spotify.com/track/${id}` : "";
+}
+
 function chipLabel(text, max = 36) {
   const s = String(text || "");
   return s.length > max ? `${s.slice(0, max)}…` : s;
@@ -1034,7 +1052,9 @@ function renderTracks(tracks, { animate = false } = {}) {
   currentTracks = tracks;
   const container = document.getElementById("tracks");
   if (!container) return;
-  container.innerHTML = tracks.map((t, i) => `
+  container.innerHTML = tracks.map((t, i) => {
+    const spotifyUrl = getSpotifyTrackUrl(t);
+    return `
     <div class="track-entry${BRIDGE_ENHANCED ? " track-entry--customer" : ""}">
     <div class="track-row${animate ? " track-row--reveal" : ""}${i === 0 ? " track-row--active" : ""}${BRIDGE_ENHANCED ? " track-row--customer" : ""}" data-idx="${i}" role="button" tabindex="0" style="${animate ? `animation-delay:${i * 0.07}s` : ""}">
       <span class="track-row__idx">${t.position}</span>
@@ -1050,13 +1070,14 @@ function renderTracks(tracks, { animate = false } = {}) {
         ${Math.round(t.novelty_score * 100)}%
         <span class="track-row__novelty-bar"><span class="track-row__novelty-fill" style="width:${Math.round(t.novelty_score * 100)}%"></span></span>
       </span>
-      ${BRIDGE_ENHANCED ? "" : `<a class="track-row__link" href="${t.spotify_url}" target="_blank" rel="noopener" aria-label="Open in Spotify">
+      ${BRIDGE_ENHANCED || !spotifyUrl ? "" : `<a class="track-row__link" href="${escapeHtml(spotifyUrl)}" target="_blank" rel="noopener" aria-label="Open in Spotify">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02z"/></svg>
       </a>`}
     </div>
     <p class="track-row__bridge-note">${escapeHtml(t.explanation)}</p>
     </div>
-  `).join("");
+  `;
+  }).join("");
 
   container.querySelectorAll(".track-row").forEach(row => {
     row.addEventListener("click", e => {
@@ -1143,8 +1164,11 @@ document.getElementById("playerNext")?.addEventListener("click", () => {
 });
 
 document.getElementById("playerOpen")?.addEventListener("click", () => {
-  if (currentTracks.length && currentTracks[currentTrackIdx]?.spotify_url) {
-    window.open(currentTracks[currentTrackIdx].spotify_url, "_blank");
+  const spotifyUrl = getSpotifyTrackUrl(currentTracks[currentTrackIdx]);
+  if (currentTracks.length && spotifyUrl) {
+    window.open(spotifyUrl, "_blank", "noopener");
+  } else if (currentTracks.length) {
+    toast("Spotify link unavailable for this track");
   } else if (!BRIDGE_ONLY) {
     switchTab("bridge");
     toast("Generate a bridge session first");
